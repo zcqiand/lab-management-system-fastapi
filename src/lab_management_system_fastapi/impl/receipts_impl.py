@@ -1,16 +1,19 @@
-"""ReceiptsApiImpl —— 接样单 CRUD 5 端点（M03.F01.I01；flow 7 + assign_task + history
-留批5），语义对照 lab-springboot SampleReceiptService + SampleReceiptMapper +
-SampleReceiptRepository（REQ-2026-005 T-2）。
+"""ReceiptsApiImpl —— 接样单 CRUD 5 端点（M03.F01.I01，REQ-2026-005 T-2）+ flow act 7 /
+history / task 9 端点（REQ-2026-006 批5：M03.F01.I03 / F02.I01+I02 / F03.I02 / F05.I01 /
+F06.I01 / F07.I01 / F08.I01 / F09.I02），语义对照 lab-springboot SampleReceiptService +
+ReportFlowService + SampleReceiptMapper + SampleReceiptRepository。
 
 - tenant 收口：get/update/delete 按 findByTenantIdAndId 定位，他人租户行 miss → 404。
-- list：contractId 等值（n()）+ flowStatus 等值（JPQL IS NULL 判空——None 不过滤）+
-  keyword lower contains commission_code/project_name，ORDER BY updated_at DESC,
-  commission_code；envelope 缺省 page=1 / pageSize=20（springboot 控制器 T11 实证）。
+- list：contractId 等值（n()）+ flowStatus 等值（JPQL IS NULL 判空——None 不过滤；
+  **等值过滤仅归无 filter 路径**——三态路径 flowStatus 只进谓词，filterThreeState
+  native SQL 实证）+ keyword lower contains commission_code/project_name，
+  ORDER BY updated_at DESC, commission_code；envelope 缺省 page=1 / pageSize=20
+  （springboot 控制器 T11 实证）。
   filter 三态（5.57 入契约，SSOT = lab-nextjs db-queries）：仅认 "not_yet"/"submitted"，
   其它值（含 null）等同不传走原路径。springboot 走 native jsonb SQL；fastapi 镜像为
   Python 侧等值判定（结果集有限无 LIMIT，语义恒等）：not_yet=指定环节停在该环节
   （无环节=history 空）；submitted=已从指定环节 submit（无环节=history 非空且
-  last_submitted_by 非空）。批4 无流转数据，submitted 恒空（批5 落流转后实锚）。
+  last_submitted_by 非空）。批5 流转数据实锚（test_receipts_filter_submitted_deep）。
 - create：contractId 前置校验（tenant-scoped miss → 404 "Contract not found"）；
   flowStatus=receiving、flowHistory=[]、result=''（ReceiptResult.EMPTY）；
   id = R-<uuid4>；列表字段 null/空 → []（serializeStringList 镜像）。
@@ -27,12 +30,16 @@ from uuid import uuid4
 from lab_management_system_fastapi.apis.receipts_api_base import BaseReceiptsApi
 from lab_management_system_fastapi.entities import Contracts, SampleReceipts
 from lab_management_system_fastapi.impl.context import get_context
-from lab_management_system_fastapi.impl.errors import NotFoundError
+from lab_management_system_fastapi.impl.errors import BadRequestError, NotFoundError
 from lab_management_system_fastapi.impl.inspection_support import (
     current_tenant_or_default,
     now_iso,
     require_login,
 )
+from lab_management_system_fastapi.models.assign_task_request import AssignTaskRequest
+from lab_management_system_fastapi.models.flow_action import FlowAction
+from lab_management_system_fastapi.models.flow_action_request import FlowActionRequest
+from lab_management_system_fastapi.models.flow_action_result import FlowActionResult
 from lab_management_system_fastapi.models.flow_history_entry import FlowHistoryEntry
 from lab_management_system_fastapi.models.flow_status import FlowStatus
 from lab_management_system_fastapi.models.receipt_result import ReceiptResult
@@ -172,6 +179,54 @@ def _three_state(rows: list[Any], filter_value: str, stage: str) -> list[Any]:
     return out
 
 
+# 状态机转移表（ReportFlowService 枚举映射镜像）：SUBMIT_NEXT 链 + RETURN_PREV 严格反向
+# + WITHDRAW 仅 receiving 自转移；(stage, action) 无映射 → invalid transition
+_SUBMIT_NEXT: dict[FlowStatus, FlowStatus] = {
+    FlowStatus.RECEIVING: FlowStatus.TASK_ASSIGNMENT,
+    FlowStatus.TASK_ASSIGNMENT: FlowStatus.DATA_ENTRY,
+    FlowStatus.DATA_ENTRY: FlowStatus.REVIEW,
+    FlowStatus.REVIEW: FlowStatus.APPROVAL,
+    FlowStatus.APPROVAL: FlowStatus.ISSUANCE,
+    FlowStatus.ISSUANCE: FlowStatus.ARCHIVED,
+}
+_TRANSITIONS: dict[tuple[FlowStatus, FlowAction], FlowStatus] = {
+    **{(s, FlowAction.SUBMIT): t for s, t in _SUBMIT_NEXT.items()},
+    **{(t, FlowAction.RETURN): s for s, t in _SUBMIT_NEXT.items()},
+    (FlowStatus.RECEIVING, FlowAction.WITHDRAW): FlowStatus.RECEIVING,
+}
+
+
+def _append_history(
+    current: list[Any],
+    action: str,
+    operator: str,
+    from_stage: str,
+    to_stage: str,
+    reason: str | None,
+) -> list[dict[str, str]]:
+    """appendHistory 镜像：reason null 强转 ""（js(null)→""，条目六键恒在）。"""
+    return [
+        *current,
+        {
+            "action": action,
+            "from": from_stage,
+            "to": to_stage,
+            "operator": operator,
+            "at": now_iso(),
+            "reason": reason if reason is not None else "",
+        },
+    ]
+
+
+def _ok(id_: str, target: FlowStatus) -> FlowActionResult:
+    """springboot ok(id, target) 镜像：message 缺省 None 不落 JSON（NON_NULL）。"""
+    return FlowActionResult(id=id_, ok=True, flowStatus=target)
+
+
+def _err(id_: str, message: str) -> FlowActionResult:
+    return FlowActionResult(id=id_, ok=False, message=message)
+
+
 class ReceiptsApiImpl(BaseReceiptsApi):
     """M03.F01.I01：接样单 CRUD（本批 5 端点；flow 7 + assign_task + history 留批5）。"""
 
@@ -195,8 +250,6 @@ class ReceiptsApiImpl(BaseReceiptsApi):
         )
         if contract_id:
             rows = [r for r in rows if r.contract_id == contract_id]
-        if flow_status is not None:
-            rows = [r for r in rows if r.flow_status == flow_status.value]
         if keyword:
             kw = keyword.lower()
             rows = [
@@ -205,8 +258,12 @@ class ReceiptsApiImpl(BaseReceiptsApi):
                 if kw in (r.commission_code or "").lower() or kw in (r.project_name or "").lower()
             ]
         if filter in ("not_yet", "submitted"):
+            # 三态路径镜像 filterThreeState native SQL：flowStatus 只进三态谓词，
+            # 不做等值预过滤（springboot list() 分流实证——等值过滤仅归无 filter 路径）
             stage = flow_status.value if flow_status is not None else ""
             rows = _three_state(rows, filter, stage)
+        elif flow_status is not None:
+            rows = [r for r in rows if r.flow_status == flow_status.value]
         return ReceiptsListReceipts200Response(
             items=[_receipt_dto(r) for r in rows],
             page=page if page is not None else 1,
@@ -296,3 +353,176 @@ class ReceiptsApiImpl(BaseReceiptsApi):
         row = _scoped_row(ctx, current_tenant_or_default(ctx, claims), id)
         ctx.session.delete(row)
         ctx.session.commit()
+
+    # ------------------------------------------------------------------
+    # 批5（REQ-2026-006）：flow act 7 + history + task（M03.F01.I03 / F02.I01+I02 /
+    # F03.I02 / F05.I01 / F06.I01 / F07.I01 / F08.I01 / F09.I02），镜像
+    # ReportFlowService.actForStage/actArchived + SampleReceiptService.assignTask/transitionTo
+    # ------------------------------------------------------------------
+
+    async def receipts_act_flow_approve(
+        self, flow_action_request: FlowActionRequest
+    ) -> list[FlowActionResult]:
+        return self._act_for_stage(FlowStatus.APPROVAL, flow_action_request)
+
+    async def receipts_act_flow_assigning(
+        self, flow_action_request: FlowActionRequest
+    ) -> list[FlowActionResult]:
+        return self._act_for_stage(FlowStatus.TASK_ASSIGNMENT, flow_action_request)
+
+    async def receipts_act_flow_data_entry(
+        self, flow_action_request: FlowActionRequest
+    ) -> list[FlowActionResult]:
+        return self._act_for_stage(FlowStatus.DATA_ENTRY, flow_action_request)
+
+    async def receipts_act_flow_issuance(
+        self, flow_action_request: FlowActionRequest
+    ) -> list[FlowActionResult]:
+        return self._act_for_stage(FlowStatus.ISSUANCE, flow_action_request)
+
+    async def receipts_act_flow_receiving(
+        self, flow_action_request: FlowActionRequest
+    ) -> list[FlowActionResult]:
+        return self._act_for_stage(FlowStatus.RECEIVING, flow_action_request)
+
+    async def receipts_act_flow_review(
+        self, flow_action_request: FlowActionRequest
+    ) -> list[FlowActionResult]:
+        return self._act_for_stage(FlowStatus.REVIEW, flow_action_request)
+
+    async def receipts_act_flow_archived(
+        self, flow_action_request: FlowActionRequest
+    ) -> list[FlowActionResult]:
+        """actArchived 镜像：先 stage 后 action；仅 SUBMIT 自转移写 audit history。"""
+        ctx = get_context()
+        claims = require_login(ctx)
+        tenant = current_tenant_or_default(ctx, claims)
+        body = flow_action_request
+        if body is None or not body.operator:
+            raise BadRequestError("operator is required")
+        out: list[FlowActionResult] = []
+        for id_ in body.ids:
+            row = ctx.session.get(SampleReceipts, id_)
+            if row is None or row.tenant_id != tenant:
+                out.append(_err(id_, f"Receipt not found: {id_}"))
+                continue
+            if row.flow_status != FlowStatus.ARCHIVED.value:
+                out.append(
+                    _err(
+                        id_,
+                        f"Stage mismatch: requires archived but is {row.flow_status}",
+                    )
+                )
+                continue
+            if body.action != FlowAction.SUBMIT:
+                out.append(
+                    _err(
+                        id_,
+                        "Action not allowed: archived accepts only submit but got "
+                        f"{body.action.value}",
+                    )
+                )
+                continue
+            # 写 history 当 audit，状态保持 archived；reason 缺省（springboot 同款）
+            reason = body.reason if body.reason is not None else "archived: post-archive audit"
+            hist = row.flow_history if isinstance(row.flow_history, list) else []
+            row.flow_history = _append_history(
+                hist,
+                FlowAction.SUBMIT.value,
+                body.operator,
+                FlowStatus.ARCHIVED.value,
+                FlowStatus.ARCHIVED.value,
+                reason,
+            )
+            row.last_submitted_by = body.operator  # submit 写 lastSubmittedBy
+            row.updated_at = now_iso()
+            ctx.session.commit()
+            ctx.session.refresh(row)
+            out.append(_ok(id_, FlowStatus.ARCHIVED))
+        return out
+
+    async def receipts_get_receipt_history(self, id: str) -> list[FlowHistoryEntry]:
+        ctx = get_context()
+        claims = require_login(ctx)
+        row = _scoped_row(ctx, current_tenant_or_default(ctx, claims), id)
+        return _history(row)
+
+    async def receipts_assign_task(
+        self, id: str, assign_task_request: AssignTaskRequest
+    ) -> SampleReceipt:
+        ctx = get_context()
+        claims = require_login(ctx)
+        row = _scoped_row(ctx, current_tenant_or_default(ctx, claims), id)
+        body = assign_task_request
+        if body is None:
+            # springboot @RequestBody 默认 required → 缺 body 400（校验层口径）
+            raise BadRequestError("request body is required")
+        # assignTask 镜像：三字段 None 跳过；任何 stage 可 assign（updatedAt 恒刷）；
+        # 仅 RECEIVING 直写推进+history（不走 transitionTo：last_submitted_by 不写）；
+        # operator=assigneeName，None 时 js(null)→"" 镜像强转空串
+        if body.assignee_id is not None:
+            row.assignee_id = body.assignee_id
+        if body.assignee_name is not None:
+            row.assignee_name = body.assignee_name
+        if body.planned_test_date is not None:
+            row.planned_test_date = body.planned_test_date
+        if row.flow_status == FlowStatus.RECEIVING.value:
+            row.flow_status = FlowStatus.TASK_ASSIGNMENT.value
+            row.flow_history = _append_history(
+                row.flow_history or [],
+                FlowAction.SUBMIT.value,
+                body.assignee_name if body.assignee_name is not None else "",
+                FlowStatus.RECEIVING.value,
+                FlowStatus.TASK_ASSIGNMENT.value,
+                "M03.F02 任务分配",
+            )
+        row.updated_at = now_iso()
+        ctx.session.commit()
+        ctx.session.refresh(row)
+        return _receipt_dto(row)
+
+    def _act_for_stage(
+        self, stage: FlowStatus, flow_action_request: FlowActionRequest
+    ) -> list[FlowActionResult]:
+        """actForStage 共享路由：operator 校验先于 per-id 循环；逐条 ok/err 恒 200。"""
+        ctx = get_context()
+        claims = require_login(ctx)
+        tenant = current_tenant_or_default(ctx, claims)
+        body = flow_action_request
+        if body is None or not body.operator:
+            raise BadRequestError("operator is required")
+        out: list[FlowActionResult] = []
+        for id_ in body.ids:
+            row = ctx.session.get(SampleReceipts, id_)
+            if row is None or row.tenant_id != tenant:
+                out.append(_err(id_, f"Receipt not found: {id_}"))
+                continue
+            if row.flow_status != stage.value:
+                out.append(
+                    _err(id_, f"Stage mismatch: requires {stage.value} but is {row.flow_status}")
+                )
+                continue
+            target = _TRANSITIONS.get((stage, body.action))
+            if target is None:
+                out.append(
+                    _err(id_, f"Invalid transition from {row.flow_status} with {body.action.value}")
+                )
+                continue
+            row.flow_status = target.value
+            if body.action == FlowAction.SUBMIT:
+                row.last_submitted_by = body.operator
+            elif body.action == FlowAction.WITHDRAW:
+                row.last_submitted_by = None  # WITHDRAW 清空，RETURN 保留
+            row.flow_history = _append_history(
+                row.flow_history if isinstance(row.flow_history, list) else [],
+                body.action.value,
+                body.operator,
+                stage.value,
+                target.value,
+                body.reason,
+            )
+            row.updated_at = now_iso()
+            ctx.session.commit()
+            ctx.session.refresh(row)
+            out.append(_ok(id_, target))
+        return out

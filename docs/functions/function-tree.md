@@ -105,21 +105,31 @@ FastAPI 后端 —— 与 springboot / aspnetcore / rails 后端同构的家族�
 | 功能 ID | 功能名称 | 说明 | 状态 |
 |---|---|---|---|
 | M03.F01 | 接样管理 | 接样单 CRUD、报告类别关联、流程状态 | 已上线 |
-| M03.F02 | 任务分配 | 接样提交后安排检测人员/计划日期，提交进入数据录入 | 规划 |
-| M03.F03 | 数据录入 | 样品检测数据录入 | 规划 |
-| M03.F05 | 报告审核 | 报告审核流程 | 规划 |
-| M03.F06 | 报告批准 | 报告批准流程 | 规划 |
-| M03.F07 | 报告发放 | 报告发放流程 | 规划 |
-| M03.F08 | 报告归档 | 报告归档流程 | 规划 |
+| M03.F02 | 任务分配 | 接样提交后安排检测人员/计划日期，提交进入数据录入 | 已上线 |
+| M03.F03 | 数据录入 | 样品检测数据录入 | 已上线 |
+| M03.F05 | 报告审核 | 报告审核流程 | 已上线 |
+| M03.F06 | 报告批准 | 报告批准流程 | 已上线 |
+| M03.F07 | 报告发放 | 报告发放流程 | 已上线 |
+| M03.F08 | 报告归档 | 报告归档流程 | 已上线 |
 | M03.F09 | 接样单详情 | 接样单查看（接样信息+样品信息+检测数据） | 已上线 |
 
-### M03 子项（REQ-2026-005 批4 拆分）
+### M03 子项（REQ-2026-005 批4 拆分；REQ-2026-006 批5 追加）
 
 | 子项 ID | 名称 | 归属功能 | 状态 |
 |---|---|---|---|
 | M03.F01.I01 | 接样单 CRUD（contractId FK 校验 404 + 流程默认值 receiving/[]/"" + 三态 filter + 部分更新 + 业务码不可改） | M03.F01 | 已上线 |
 | M03.F01.I02 | 样品 CRUD + ext 整体替换补录（receiptId FK 校验 404 + keyword/receiptId 过滤） | M03.F01 | 已上线 |
 | M03.F09.I01 | 接样单详情面（GET receipt 全字段 + samples 按 receiptId 清单，检测数据归批5） | M03.F09 | 已上线 |
+| M03.F01.I03 | 接样阶段流转 act（POST /api/receipts/receiving/act：SUBMIT 上链推进、RETURN 无前驱拒、WITHDRAW 撤回自转移写 history） | M03.F01 | 已上线 |
+| M03.F02.I01 | 任务分配（PUT /api/receipts/{id}/task：三字段 None 跳过 + updatedAt 恒刷；仅 RECEIVING 推进 task_assignment 且 history operator=assigneeName；任何 stage 可 assign） | M03.F02 | 已上线 |
+| M03.F02.I02 | 任务分配阶段 act（POST /api/receipts/assigning/act） | M03.F02 | 已上线 |
+| M03.F03.I01 | 检测记录管理（/api/test-records 6 端点：envelope page??1/pageSize??20 + sampleId 过滤 + TR- 前缀 + verdict 改判 + 业务键 sample_id 不可改） | M03.F03 | 已上线 |
+| M03.F03.I02 | 数据录入阶段 act（POST /api/receipts/data-entry/act） | M03.F03 | 已上线 |
+| M03.F05.I01 | 审核阶段 act（POST /api/receipts/review/act） | M03.F05 | 已上线 |
+| M03.F06.I01 | 批准阶段 act（POST /api/receipts/approve/act） | M03.F06 | 已上线 |
+| M03.F07.I01 | 发放阶段 act（POST /api/receipts/issuance/act） | M03.F07 | 已上线 |
+| M03.F08.I01 | 归档特例 act（POST /api/receipts/archived/act：仅 SUBMIT 自转移 audit，reason 缺省 archived: post-archive audit；非 SUBMIT 拒） | M03.F08 | 已上线 |
+| M03.F09.I02 | 流程历史（GET /api/receipts/{id}/history：miss 404、空/坏 JSON → []；条目六键恒在、reason null→""） | M03.F09 | 已上线 |
 
 ## M04 基础数据
 

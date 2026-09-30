@@ -183,6 +183,7 @@ def create_app(config: AppConfig, engine: Engine | None = None) -> FastAPI:
         # 均为成功删除或 unlink no-op）。
         # 批3（REQ-2026-004）：catalog 码表四面 DELETE。
         # 批4（REQ-2026-005）：合同/接样单/样品 DELETE（receipt 删样品走 DB CASCADE 双侧一致）。
+        # 批5（REQ-2026-006）：检测记录 DELETE。
         if response.status_code == 200 and (
             (request.method == "POST" and request.url.path == "/api/auth/logout")
             or (request.method == "POST" and request.url.path.startswith("/api/inspection/links/"))
@@ -207,6 +208,7 @@ def create_app(config: AppConfig, engine: Engine | None = None) -> FastAPI:
             or (request.method == "DELETE" and request.url.path.startswith("/api/contracts/"))
             or (request.method == "DELETE" and request.url.path.startswith("/api/receipts/"))
             or (request.method == "DELETE" and request.url.path.startswith("/api/samples/"))
+            or (request.method == "DELETE" and request.url.path.startswith("/api/test-records/"))
         ):
             return Response(status_code=204)
         return response
