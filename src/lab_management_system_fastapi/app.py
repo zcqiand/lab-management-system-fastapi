@@ -172,11 +172,34 @@ def create_app(config: AppConfig, engine: Engine | None = None) -> FastAPI:
         finally:
             reset_context(token)
             session.close()
-        # 生成区路由对 logout 只声明了 204 responses 没声明 status_code，FastAPI 回 200 null；
-        # 家族契约是 204 空体（springboot logout noContent 参照）—— 组合根收口，不动生成区。
-        # 批2 起的幂等 DELETE 照 saas 仓同款在此追加。
+        # 生成区路由对 204 端点只声明了 responses 没声明 status_code，FastAPI 回 200 null；
+        # 家族契约是 204 空体（springboot logout/junctionService noContent 参照）——
+        # 组合根收口，不动生成区（saas 仓同款）。
+        # 批1：POST /api/auth/logout；
+        # 批2（REQ-2026-003）：字典四 junction link（POST …/links/*）、calc/techreq
+        # delete、report-names 三 link 家族、param-interfaces link、以及五面全部
+        # DELETE（实体 delete 幂等/404 前置已在 impl resolve，能到这里的 200 null
+        # 均为成功删除或 unlink no-op）。
         if response.status_code == 200 and (
-            request.method == "POST" and request.url.path == "/api/auth/logout"
+            (request.method == "POST" and request.url.path == "/api/auth/logout")
+            or (request.method == "POST" and request.url.path.startswith("/api/inspection/links/"))
+            or (
+                request.method == "POST" and request.url.path.startswith("/api/report-names/links/")
+            )
+            or (request.method == "POST" and request.url.path == "/api/param-interfaces/links")
+            or (request.method == "DELETE" and request.url.path.startswith("/api/inspection/"))
+            or (
+                request.method == "DELETE"
+                and request.url.path.startswith("/api/calculation-methods/")
+            )
+            or (
+                request.method == "DELETE"
+                and request.url.path.startswith("/api/technical-requirements/")
+            )
+            or (request.method == "DELETE" and request.url.path.startswith("/api/report-names/"))
+            or (
+                request.method == "DELETE" and request.url.path.startswith("/api/param-interfaces/")
+            )
         ):
             return Response(status_code=204)
         return response
