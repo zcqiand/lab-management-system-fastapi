@@ -180,6 +180,7 @@ def create_app(config: AppConfig, engine: Engine | None = None) -> FastAPI:
         # delete、report-names 三 link 家族、param-interfaces link、以及五面全部
         # DELETE（实体 delete 幂等/404 前置已在 impl resolve，能到这里的 200 null
         # 均为成功删除或 unlink no-op）。
+        # 批3（REQ-2026-004）：catalog 码表四面 DELETE。
         if response.status_code == 200 and (
             (request.method == "POST" and request.url.path == "/api/auth/logout")
             or (request.method == "POST" and request.url.path.startswith("/api/inspection/links/"))
@@ -200,6 +201,7 @@ def create_app(config: AppConfig, engine: Engine | None = None) -> FastAPI:
             or (
                 request.method == "DELETE" and request.url.path.startswith("/api/param-interfaces/")
             )
+            or (request.method == "DELETE" and request.url.path.startswith("/api/catalog/"))
         ):
             return Response(status_code=204)
         return response
