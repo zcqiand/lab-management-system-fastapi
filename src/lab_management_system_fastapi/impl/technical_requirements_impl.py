@@ -19,7 +19,7 @@ from lab_management_system_fastapi.entities import (
     InspectionTechnicalRequirements,
 )
 from lab_management_system_fastapi.impl.context import get_context
-from lab_management_system_fastapi.impl.errors import BadRequestError, NotFoundError
+from lab_management_system_fastapi.impl.errors import NotFoundError
 from lab_management_system_fastapi.impl.inspection_support import (
     current_tenant_or_default,
     now_iso,
@@ -120,10 +120,11 @@ class TechnicalRequirementsApiImpl(BaseTechnicalRequirementsApi):
             inspection_parameter_code=body.inspection_parameter_code,
             judgment_standard_code=body.judgment_standard_code,
         )
-        # springboot 缺省 comparison='u' 在契约枚举 {>=,<=,=,range,eq} 中不可表达
-        # （响应模型必填）——缺失 400，不落库。
-        if body.comparison is None:
-            raise BadRequestError("comparison is required")
+        # springboot Mapper 镜像：comparison 缺失落 RequirementComparison.u。
+        # wire 值是 "≥"（Java 枚举名 u/u2 是 codegen 对 ≥/≤ 的转义名——2026-10-01
+        # CT live 修正：原判「'u' 在契约枚举不可表达，缺失 400」误把 Java 名当
+        # wire 值；wire 值 ≥ 可表达，缺省照镜像落 ≥）。
+        comparison = body.comparison if body.comparison is not None else "≥"
         session = ctx.session
         now = now_iso()
         row = session.get(
@@ -152,7 +153,7 @@ class TechnicalRequirementsApiImpl(BaseTechnicalRequirementsApi):
                 target_value=body.target_value,
                 expression=body.expression,
                 unit=body.unit,
-                comparison=body.comparison,
+                comparison=comparison,
                 clause=body.clause,
                 source_page=body.source_page,
                 source_hash=body.source_hash,
@@ -176,7 +177,7 @@ class TechnicalRequirementsApiImpl(BaseTechnicalRequirementsApi):
             row.target_value = body.target_value
             row.expression = body.expression
             row.unit = body.unit
-            row.comparison = body.comparison
+            row.comparison = comparison
             row.clause = body.clause
             row.source_page = body.source_page
             row.source_hash = body.source_hash
@@ -256,8 +257,9 @@ class TechnicalRequirementsApiImpl(BaseTechnicalRequirementsApi):
             )
             if getattr(body, name) is not None
         }
-        if not partial:
-            raise BadRequestError("update payload is empty")
+        # 空载荷 no-op 200 镜像（springboot applyUpdate 全 null 跳过 → save 空变更）：
+        # CT live 用契约外字段（requirement）做 PUT 探针，springboot Jackson 未知字段
+        # 忽略 → 200；2026-10-01 修正：去掉 impl 自加的空载荷 400（springboot 无此校验）
         for name, value in partial.items():
             setattr(row, name, value)
         row.updated_at = now_iso()

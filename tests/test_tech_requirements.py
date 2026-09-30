@@ -5,10 +5,11 @@ claim tenant_id 非空用之，否则 directory 默认租户 TENANT-001（目录
 兜底，ADR-0019 合规）。种子：同三键双租户行（TENANT-001 verified min30 /
 TENANT-002 draft min25）。
 
-契约差异点（REQ 澄清记录）：springboot 缺省 comparison='u'，fastapi 枚举值域
-{≥,≤,=,range,eq} 无 'u' 成员且响应模型必填——缺省不可表达，impl 裁定缺失 400
-（写进表会毒化后续 list 500）。valueType/judgmentMode/verificationStatus 契约
-可空，默认路径可达（numeric/manual/draft 镜像）。
+契约差异点（REQ 澄清记录，2026-10-01 批6 CT live 修正）：springboot Mapper 缺省
+comparison=RequirementComparison.u，wire 值是 "≥"（u/u2 是 Java 枚举对 ≥/≤ 的
+转义名）——fastapi 照镜像缺失落 "≥"（旧判「无 'u' 成员缺省 400」误把 Java 名当
+wire 值，已废）。valueType/judgmentMode/verificationStatus 契约可空，默认路径
+可达（numeric/manual/draft 镜像）。
 """
 
 from __future__ import annotations
@@ -124,9 +125,10 @@ def test_get_by_triple_key_and_missing_404(db_client: TestClient, bearer: str) -
 
 
 @pytest.mark.fn("M06.F06.I01")
-def test_create_defaults_and_comparison_required(db_client: TestClient, bearer: str) -> None:
+def test_create_defaults_and_comparison_default(db_client: TestClient, bearer: str) -> None:
     headers = _auth(db_client, bearer)
-    # comparison 缺失 → 400（契约无 'u' 成员，缺省不可表达——REQ 澄清记录裁定）
+    # comparison 缺失 → 镜像 springboot Mapper 缺省 RequirementComparison.u（wire "≥"）
+    # ——2026-10-01 批6 CT live 修正：旧判「契约无 'u' 成员」误把 Java 枚举名当 wire 值
     resp = db_client.post(
         "/api/technical-requirements",
         json={
@@ -136,7 +138,8 @@ def test_create_defaults_and_comparison_required(db_client: TestClient, bearer: 
         },
         headers=headers,
     )
-    assert resp.status_code == 400, resp.text
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["comparison"] == "≥"
     # valueType/judgmentMode/verificationStatus 缺省可达（镜像 numeric/manual/draft）
     resp = db_client.post(
         "/api/technical-requirements",

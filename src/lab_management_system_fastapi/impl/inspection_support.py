@@ -57,13 +57,17 @@ def require_non_blank(**fields: str | None) -> None:
 
 
 def current_tenant_or_default(ctx: RequestContext, claims: dict[str, object]) -> str:
-    """springboot TechnicalRequirementService.currentTenantIdOrDefault() 镜像：
-    claim tenant_id 非空用之，否则 directory 默认租户（config 契约值，非字面量
-    兜底——ADR-0019 合规）。"""
+    """springboot currentTenantIdOrDefaultStatic 镜像：claim tenant_id 非空用之，
+    否则 directory 默认租户（ConfigUserDirectory.defaultTenant().getTenantId()，
+    = "TENANT-001" 业务码）。2026-10-01 CT live 修正：原走 LAB_SAAS_DEFAULT_TENANT_ID
+    env 是 SSO 请求体 body.tenantId 的值源（SaasAuthClient 镜像，saas_client 仍在用），
+    不是业务端点租户 fallback——live contracts/technical-requirements 回显 UUID 与
+    springboot TENANT-001 分叉即此根因。"""
     claim = claims.get("tenant_id")
     if claim is not None and str(claim).strip():
         return str(claim)
-    return ctx.config.saas_default_tenant_id
+    directory = ctx.request.app.state.directory
+    return str(directory.default_tenant().tenant_id)
 
 
 def get_or_404(session: Session, entity: type[Any], pk: tuple[Any, ...]) -> Any:

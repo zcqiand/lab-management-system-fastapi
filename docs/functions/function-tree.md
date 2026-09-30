@@ -38,7 +38,7 @@ FastAPI 后端 —— 与 springboot / aspnetcore / rails 后端同构的家族�
 | M02 | 资源管理 | 合同管理 | 规划 |
 | M03 | 试验过程管理 | 接样 → 任务分配 → 数据录入 → 报告审核 → 批准 → 发放 → 归档 | 规划 |
 | M04 | 基础数据 | 型号/规格/等级/牌号维护 | 规划 |
-| M05 | 数据统计 | 报告汇总表（按报告名称） | 规划 |
+| M05 | 数据统计 | 报告汇总表（按报告名称） | 已上线 |
 | M06 | 检测能力 | 检测专项/项目/参数/标准/计算方法/技术要求/报告名称/参数界面 | 规划 |
 
 ---
@@ -153,7 +153,16 @@ FastAPI 后端 —— 与 springboot / aspnetcore / rails 后端同构的家族�
 
 | 功能 ID | 功能名称 | 说明 | 状态 |
 |---|---|---|---|
-| M05.F01 | 报告汇总 | 按报告类别输出试验报告汇总表 + 仪表盘统计 | 规划 |
+| M05.F01 | 报告汇总 | 按报告类别输出试验报告汇总表 + 仪表盘统计 | 已上线 |
+
+### M05 子项（REQ-2026-007 批6 拆分）
+
+| 子项 ID | 名称 | 归属功能 | 状态 |
+|---|---|---|---|
+| M05.F01.I01 | 报告汇总表（GET /api/summary：ALL/类别/日期界过滤 + commission_date DESC 排序 + 六列行 null→""） | M05.F01 | 已上线 |
+| M05.F01.I03 | 核心指标卡（todayTestCount 本地今日前缀 + qualifiedRateByMaterial 码表关键词 + reportOutputByStatus 三桶） | M05.F01 | 已上线 |
+| M05.F01.I04 | 任务漏斗（funnelByStage 六段，testing/reporting 按 reportCode 有无分桶） | M05.F01 | 已上线 |
+| M05.F01.I06 | 仪表盘基础（contractCount/receiptCount/sampleCount + reportCountByStatus 三桶 + pendingTaskCount） | M05.F01 | 已上线 |
 
 ## M06 检测能力
 
