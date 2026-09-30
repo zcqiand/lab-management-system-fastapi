@@ -79,7 +79,7 @@ def test_create_defaults(db_client: TestClient, bearer: str) -> None:
     assert body["algorithmType"] == "manual"  # 默认 manual
     assert body["specimenCount"] == 1  # 默认 1
     assert body["sortOrder"] == 0
-    assert body["testingStandardCode"] is None
+    assert "testingStandardCode" not in body  # null 不落 JSON（NON_NULL 镜像）
     # 复合主键可见
     resp = db_client.get("/api/calculation-methods/OBJ-02/PAR-B", headers=_auth(db_client, bearer))
     assert resp.status_code == 200

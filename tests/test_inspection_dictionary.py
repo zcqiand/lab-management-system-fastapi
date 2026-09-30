@@ -228,7 +228,7 @@ def test_specialty_object_link_upsert_overwrites_payload_unlink_idempotent(
     assert resp.status_code == 204
     body = db_client.get(url, params={"inspectionSpecialtyCode": "SP-02"}, headers=headers).json()
     assert body["total"] == 1
-    assert body["items"][0]["remark"] is None
+    assert "remark" not in body["items"][0]  # NON_NULL 镜像
     # unlink 幂等 204
     resp = db_client.request(
         "DELETE",

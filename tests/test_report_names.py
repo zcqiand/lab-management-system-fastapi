@@ -48,8 +48,7 @@ def test_get_and_ext_fields_roundtrip(db_client: TestClient, bearer: str) -> Non
         "label": "浇筑日期",
         "type": "date",
         "required": True,
-        "options": None,
-        "tag": None,
+        # options/tag 为 null：NON_NULL 镜像递归剔嵌套 null 键，不落 JSON
         "source": "sample",
     }
     assert ext[1]["options"] == ["C25", "C30", "C35"]
@@ -69,7 +68,7 @@ def test_create_defaults_and_ext_fields_payload(db_client: TestClient, bearer: s
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["sortOrder"] == 0
-    assert body["extFields"] is None
+    assert "extFields" not in body  # NON_NULL 镜像
     resp = db_client.post(
         "/api/report-names",
         json={
@@ -219,7 +218,7 @@ def test_report_name_parameter_links_upsert_overwrites(db_client: TestClient, be
     assert resp.status_code == 204
     body = db_client.get(url, params={"reportNameCode": "RN-02"}, headers=headers).json()
     assert body["total"] == 1
-    assert body["items"][0]["remark"] is None
+    assert "remark" not in body["items"][0]  # NON_NULL 镜像
     resp = db_client.request(
         "DELETE",
         url,

@@ -104,8 +104,8 @@ def test_brands_crud_roundtrip(db_client: TestClient, bearer: str) -> None:
     m_row = merge.json()
     assert m_row["name"] == "重创建"
     assert m_row["sortOrder"] == 5
-    assert m_row["remark"] is None  # 载荷 None 覆盖（merge 全字段）
-    assert m_row["inspectionObjectCode"] is None
+    assert "remark" not in m_row  # 载荷 None 覆盖（merge 全字段）+ NON_NULL 不落 JSON
+    assert "inspectionObjectCode" not in m_row
     assert m_row["createdAt"] != first_created  # merge 刷新 createdAt
     lst2 = db_client.get("/api/catalog/brands", headers=headers).json()
     assert lst2["total"] == 2  # 未新增行
@@ -203,8 +203,8 @@ def test_grades_defaults_and_missing_400(db_client: TestClient, bearer: str) -> 
     row = ok.json()
     assert row["tenantId"] == "TENANT-001"
     assert row["sortOrder"] == 0
-    assert row["inspectionObjectCode"] is None
-    assert row["remark"] is None
+    assert "inspectionObjectCode" not in row
+    assert "remark" not in row
     # 避开种子占用的 C25/C30（PK=code 单键）；GRD-1 可见
     lst = db_client.get("/api/catalog/grades", headers=headers).json()
     assert [r["code"] for r in lst["items"]] == ["GRD-1"]

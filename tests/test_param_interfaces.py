@@ -65,8 +65,8 @@ def test_create_defaults_and_config_payload(db_client: TestClient, bearer: str) 
     body = resp.json()
     assert body["isOfficial"] is True  # 默认 true
     assert body["sortOrder"] == 0
-    assert body["config"] is None
-    assert body["name"] is None  # 契约可空
+    assert "config" not in body
+    assert "name" not in body  # 契约可空；null 不落 JSON（NON_NULL 镜像）
     resp = db_client.post(
         "/api/param-interfaces",
         json={
@@ -138,7 +138,7 @@ def test_param_interface_link_upsert_unlink_idempotent(db_client: TestClient, be
     body = db_client.get(url, params={"inspectionParameterCode": "PAR-B"}, headers=headers).json()
     assert body["total"] == 1
     assert body["items"][0]["config"] == {"w": 1}
-    assert body["items"][0]["reportNameCode"] is None
+    assert "reportNameCode" not in body["items"][0]  # NON_NULL 镜像
     # 同键再 link：config=None 覆盖既有 config（载荷含 None 覆盖）
     resp = db_client.post(
         url,
@@ -152,7 +152,7 @@ def test_param_interface_link_upsert_unlink_idempotent(db_client: TestClient, be
     assert resp.status_code == 204
     body = db_client.get(url, params={"inspectionParameterCode": "PAR-B"}, headers=headers).json()
     assert body["total"] == 1
-    assert body["items"][0]["config"] is None
+    assert "config" not in body["items"][0]  # None 覆盖后不落 JSON（NON_NULL 镜像）
     assert body["items"][0]["reportNameCode"] == "RN-02"
     # unlink 幂等
     resp = db_client.request(

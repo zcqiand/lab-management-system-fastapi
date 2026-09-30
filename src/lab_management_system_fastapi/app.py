@@ -19,6 +19,7 @@ from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
+from fastapi.routing import APIRoute
 from pydantic import Strict
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
@@ -181,6 +182,7 @@ def create_app(config: AppConfig, engine: Engine | None = None) -> FastAPI:
         # DELETE（实体 delete 幂等/404 前置已在 impl resolve，能到这里的 200 null
         # 均为成功删除或 unlink no-op）。
         # 批3（REQ-2026-004）：catalog 码表四面 DELETE。
+        # 批4（REQ-2026-005）：合同/接样单/样品 DELETE（receipt 删样品走 DB CASCADE 双侧一致）。
         if response.status_code == 200 and (
             (request.method == "POST" and request.url.path == "/api/auth/logout")
             or (request.method == "POST" and request.url.path.startswith("/api/inspection/links/"))
@@ -202,6 +204,9 @@ def create_app(config: AppConfig, engine: Engine | None = None) -> FastAPI:
                 request.method == "DELETE" and request.url.path.startswith("/api/param-interfaces/")
             )
             or (request.method == "DELETE" and request.url.path.startswith("/api/catalog/"))
+            or (request.method == "DELETE" and request.url.path.startswith("/api/contracts/"))
+            or (request.method == "DELETE" and request.url.path.startswith("/api/receipts/"))
+            or (request.method == "DELETE" and request.url.path.startswith("/api/samples/"))
         ):
             return Response(status_code=204)
         return response
@@ -230,6 +235,13 @@ def create_app(config: AppConfig, engine: Engine | None = None) -> FastAPI:
 
     for router in _ROUTERS:
         _relax_strict_query_ints(router)
+        # 家族 DTO 序列化形状：springboot 逐 DTO @JsonInclude(NON_NULL) 镜像——
+        # null 可选字段不落 JSON（T11 live 实证 GET receipt 无 issuedAt 键）。
+        # include 复制路由时读 route 属性固化进 handler 闭包（include_router
+        # 本身不收 exclude_none 参数；生成区零改动，挂属性即全局生效）。
+        for route in router.routes:
+            if isinstance(route, APIRoute):
+                route.response_model_exclude_none = True
         app.include_router(router)
     return app
 
