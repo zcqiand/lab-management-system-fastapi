@@ -6,6 +6,8 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
+    # lab JWT 签发（LabJwtSigner 镜像，HS256）；版本钉版镜像 saas-identity-platform-fastapi
+    "pyjwt==2.10.1",
 ]
 
 [project.optional-dependencies]
@@ -50,7 +52,15 @@ module = [
     "lab_management_system_fastapi.security_api",
     "lab_management_system_fastapi.entities",
 ]
-follow_imports = "skip"
+# silent 而非 skip：skip 把生成模块类型降为 Any，impl 子类化 Base*Api 会报
+# subclassing-Any（saas 仓同款教训——skip 丢模型真类型，silent 保类型只压告警）
+follow_imports = "silent"
+
+[[tool.mypy.overrides]]
+module = "lab_management_system_fastapi.impl.*"
+# 生成 Base*Api 类体的 __init_subclass__ 钩子（pkgutil 缝发现机制）未标注，
+# 缝类继承语句必然触发 no-untyped-call；继承之外的手写代码保持全 strict
+disallow_untyped_calls = false
 
 [tool.setuptools.packages.find]
 where = ["src"]

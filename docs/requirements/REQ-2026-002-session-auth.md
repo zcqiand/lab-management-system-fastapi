@@ -5,7 +5,7 @@
 | 提出人 | zcqiand |
 | 提出日期 | 2026-09-30 |
 | 优先级 | P0 |
-| 状态 | 已评审 |
+| 状态 | 已验收（2026-09-30，T-1～T-5 全批完成） |
 | 关联 ADR | REQ-2026-001（总纲 T-1）；ADR-0041（三层全生成） |
 
 ## 1. 需求描述
@@ -42,6 +42,8 @@ env（DATABASE_URL / JWT 三键 / 身份平台地址与 OAuth 凭据）fail-fast
 | 疑问 | 澄清结论 | 澄清人 | 日期 |
 |---|---|---|---|
 | 无（范围/口径已在总纲拍板；native-login 树行口径镜像 springboot——同源直通不另立行） | — | — | — |
+| T-1「PG 真库 scratch 种子」措辞承自 saas 模板，与实现调研不符：认证域是配置式内存目录（ADR-0008），本批测试不连库 | 勘误按内存目录口径执行（tests/test_auth_batch1.py 纯 ASGI 直连 + fake saas client 注入 app.state 缝） | claude | 2026-09-30 |
+| 生成契约 SsoCallbackRequest 必填 grant_type（springboot DTO 容 null 的契约差异点） | 测试请求体带 grant_type=authorization_code；实现语义镜像 springboot（只消费 code/redirect_uri） | claude | 2026-09-30 |
 
 ## 2. 验收标准
 
@@ -59,11 +61,11 @@ env（DATABASE_URL / JWT 三键 / 身份平台地址与 OAuth 凭据）fail-fast
 
 | 任务 ID | 任务描述 | 类型 | 负责人 | 预估 | 状态 |
 |---|---|---|---|---|---|
-| T-1 | red-first：批1 全部断言测试（httpx ASGI 直连 + PG 真库 scratch 种子，挂 M00.F01.I01/M00.F02.I01/M01.F04.I01/I02/M01.F05.I01/I04/I05） | 测试 | claude | 中 | 待开始 |
-| T-2 | impl/ 基座：config（env fail-fast）/ context / errors（家族 ErrorResponse）/ security（HS256 签发校验 + 租户 claim） | 开发 | claude | 中 | 待开始 |
-| T-3 | AuthApiImpl 落 10 端点语义（SSO 簇对齐 saas 跳板语义，身份平台地址 env） | 开发 | claude | 大 | 待开始 |
-| T-4 | app.py 组合根：create_app 工厂 + 异常 handler（家族 4xx 收口）+ 静态装配冒烟 | 开发 | claude | 小 | 待开始 |
-| T-5 | 功能树同 commit：4 个 F 翻「已上线」+ 11 个 I 级子项翻「已上线」（I03/I04 前端锚定行维持开发中）；门禁 L1-L5 全绿 | 收口 | claude | 小 | 待开始 |
+| T-1 | red-first：批1 全部断言测试（httpx ASGI 直连 + PG 真库 scratch 种子，挂 M00.F01.I01/M00.F02.I01/M01.F04.I01/I02/M01.F05.I01/I04/I05） | 测试 | claude | 中 | 已完成（2026-09-30） |
+| T-2 | impl/ 基座：config（env fail-fast）/ context / errors（家族 ErrorResponse）/ security（HS256 签发校验 + 租户 claim） | 开发 | claude | 中 | 已完成（2026-09-30） |
+| T-3 | AuthApiImpl 落 10 端点语义（SSO 簇对齐 saas 跳板语义，身份平台地址 env） | 开发 | claude | 大 | 已完成（2026-09-30） |
+| T-4 | app.py 组合根：create_app 工厂 + 异常 handler（家族 4xx 收口）+ 静态装配冒烟 | 开发 | claude | 小 | 已完成（2026-09-30） |
+| T-5 | 功能树同 commit：4 个 F 翻「已上线」+ 11 个 I 级子项翻「已上线」（I03/I04 前端锚定行维持开发中）；门禁 L1-L5 全绿 | 收口 | claude | 小 | 已完成（2026-09-30） |
 
 ## 4. 功能影响
 
@@ -88,3 +90,17 @@ env（DATABASE_URL / JWT 三键 / 身份平台地址与 OAuth 凭据）fail-fast
 | SSO 簇依赖 saas 身份平台可达 | T-3 测试 | 单测内以契约形状断言为主（authorize/callback 形状锁），saas 联调归批6 live；本机 saas dev 栈在跑可真连 | 端点独立可关 |
 | 测试直连远程 PG | L4 变慢/轮换假红 | scratch 库建在同服务器（镜像 saas fastapi 配方）；假红先 ping 看丢包隔离复跑 | 断言失败即红，无静默 |
 | mypy strict 与生成区 Any 缝隙 | L3 | 生成区 follow_imports=skip 既有接线；impl 不显式 Any/type: ignore | 既有 pyproject 配置 |
+
+## 7. 验收记录（2026-09-30）
+
+| 验收项 | 证据 |
+|---|---|
+| AC-1 密码登录 200（token/refreshToken/user/tenants 四件套 + claim 形状） | tests/test_auth_batch1.py::test_login_ok（含 native-login 同源直通） |
+| AC-2 me 200 / 无 Bearer 与坏 token 401 INVALID_CREDENTIALS | test_me_password_user / test_me_requires_bearer |
+| AC-3 switch-tenant 200 换发带 claim / 非归属 404 NOT_FOUND | test_switch_tenant_reissues_token_with_claim / test_switch_unknown_tenant_404 |
+| AC-4 menus 快照树形状（title→label、icon 兜底、sortOrder 排序）+ permissions 11 项；menus miss 503 MENUS_UNAVAILABLE | test_menus_from_snapshot / test_permissions_admin_11 / test_menus_miss_503（「5 根节点」live 形状锁归批6 contract-test live） |
+| AC-5 refresh 经 saas 轮换（rotate-once 存回目录）/ saas 拒绝 401 / access token 不可当 refresh | test_refresh_via_saas_rotation / test_refresh_saas_reject_401 / test_refresh_rejects_access_token |
+| AC-6 SSO 跳板形 authorize（client_id 取 config、state 透传）+ callback 全链路（code 换 token、email upsert 幂等、双快照缓存、租户名富化） | test_sso_authorize_jump_board_shape / test_sso_authorize_missing_redirect_400 / test_sso_callback_full_flow / test_sso_callback_second_login_upserts_once |
+| AC-7 门禁 L0-L5 | gate EXIT=0（.state/gate.json，44 功能条目引用完整；软告警 2 条=I03/I04 前端锚定行维持开发中，人裁留账） |
+
+测试口径：内存目录 + fake saas client（app.state.saas_auth/saas_me 缝），trace.json 21 测试挂 9 个功能 ID（TRACE_MAP=1 collect-only 产出）。
