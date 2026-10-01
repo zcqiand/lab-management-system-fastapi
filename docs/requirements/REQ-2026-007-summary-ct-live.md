@@ -91,6 +91,7 @@ live 接入（T-6）」。用户以「继续」批准按总纲进入第六批，
 | technical-requirements POST 400（comparison is required）vs springboot 200，谁对？ | springboot 对：Mapper 缺失落 RequirementComparison.u，wire 值是 "≥"（u 是 Java 枚举转义名非 wire 值——原判「'u' 契约不可表达」误读）。修=fastapi impl 缺失照镜像落 "≥"，去 400；三后端共库 + 三键全局主键，tenant 归一后跨目标 DELETE 404 同步治愈 | claude（springboot Mapper/dto 枚举源码 + 双侧 wire 逐字段对照） | 2026-10-01 |
 | CT compare.test 端口数组断言红（期望 4 目标实得 5）？ | 本批 targets.ts 加 fastapi 的 CT 仓自身断言同步义务：compare.test 数组加 fastapi + 标题四个→五个 + 5207 断言；conventions §6 X07 槽位 2026-09-29 已登记，无需改文档 | claude（conventions §6 132-133 行实证） | 2026-10-01 |
 | TE PUT 带契约外字段（requirement）fastapi 400 vs springboot 200？ | springboot 对：Jackson 未知字段忽略 → applyUpdate 全 null 跳过 → 空更新 200；fastapi impl 自加的「空载荷 400」是分叉点（springboot 无此校验）。修=去 400，空载荷 no-op 200 镜像（连带正常 PUT/空载荷 PUT 行为回归一致） | claude（springboot Mapper.applyUpdate + 双侧实测三态 PUT） | 2026-10-01 |
+| 后记（总纲收口批修订）：本 REQ §4.5「M05 模块行不翻（M02 先例）；M03 同此惯例在册」的声明作废——T-3 树翻转实操已翻 M05 模块行（754441d），总纲收口批（REQ-2026-001，2026-10-01）据此把惯例收敛为「模块行随 F 行翻」并补齐 M02/M03/M04/M06 | 惯例收敛，树账面一致 | claude | 2026-10-01 |
 
 ## 2. 验收标准
 
