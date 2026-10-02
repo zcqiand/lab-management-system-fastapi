@@ -18,7 +18,7 @@ from typing import Union, get_args, get_origin
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.routing import APIRoute
 from pydantic import Strict
 from sqlalchemy import create_engine
@@ -245,6 +245,14 @@ def create_app(config: AppConfig, engine: Engine | None = None) -> FastAPI:
             if isinstance(route, APIRoute):
                 route.response_model_exclude_none = True
         app.include_router(router)
+
+    # 基建：根路径默认跳转 Swagger UI（REQ-2026-008 T-1；/health 同类基建端点，
+    # 不入契约面不入功能树）。include_in_schema=False 不污染 openapi schema（AC-4）；
+    # 307 临时重定向：浏览器匿名 GET 直达 /docs，契约端点零影响（跳转只占根路径）。
+    @app.get("/", include_in_schema=False)
+    async def _root_redirect() -> RedirectResponse:
+        return RedirectResponse(url="/docs", status_code=307)
+
     return app
 
 
