@@ -13,6 +13,9 @@ dependencies = [
     # 传递带入，容器 import app 即 ModuleNotFoundError；psycopg2 一并归位主依赖。
     "sqlalchemy>=2.1",
     "psycopg2-binary>=2.9",
+    # SSO 客户端出站 HTTP（impl/saas_client.py）——运行时依赖。2026-10-02 本仓
+    # v0.1.1 首航同族第二例：httpx 原在 dev 组（测试用），容器 import 即炸。
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
@@ -22,7 +25,7 @@ dev = [
     # ruff/mypy 故意不在依赖里 —— suite 钉版全局工具链（gate.py RUFF_PINNED_VERSION），
     # 项目装新版会在 venv 遮蔽钉版触发 [RUFF-PIN] exit 2（2026-09-29 实测）
     "sqlacodegen==4.0.4",
-    # sqlalchemy/psycopg2 已升主依赖（镜像 saas 仓 2026-10-02 首航事故修复），dev 组不重复声明
+    # sqlalchemy/psycopg2/httpx 已升主依赖（2026-10-02 两例首航事故），dev 组不重复声明
 ]
 
 [tool.ruff]
