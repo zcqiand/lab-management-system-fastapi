@@ -4,6 +4,9 @@ name: ci
 # 家族原则（镜像 rails/springboot ci.yml 注释）：CI=静态三件 + 组合根装配冒烟；
 # gate=全量（含 L4 真测试与 codegen 幂等 strict）。L4 首批测试落地后按需扩 CI。
 # ruff==0.15.21 与 suite gate.py RUFF_PINNED_VERSION 同版钉定——升版必须双处同步。
+# mypy==1.20.2（2026-10-02 CI 三连红修复）：1.8.0 不认识 sqlalchemy 2.1.x 源码内嵌
+# disable-error-code="untyped-decorator"（该码 1.9 引入）——CI 一体环境拉到 2.1.1 即炸
+# 23 错（全在 site-packages）；本地 anaconda 全局同版保持一致。升版先复现验证再双仓同步。
 # codegen 产物不在 CI 重放（openapi-generator/sqlacodegen 本地跑，产物 committed；
 # 幂等由 suite scripts/checks/check_codegen_idempotent.py --strict 收口）。
 on:
@@ -24,7 +27,7 @@ jobs:
       - name: 安装依赖（runtime + dev；ruff/mypy 钉 suite 全局版本）
         run: |
           pip install -e ".[dev]"
-          pip install ruff==0.15.21 mypy==1.8.0
+          pip install ruff==0.15.21 mypy==1.20.2
       - name: L1 格式（ruff format --check）
         run: ruff format --check src tests
       - name: L2 静态检查（ruff check）
@@ -32,4 +35,24 @@ jobs:
       - name: L3 类型（mypy --strict）
         run: mypy --strict src
       - name: 组合根装配冒烟（生成 router 挂载 + impl 缝可达）
+        # app 经 PEP 562 惰性构建：首次访问才读 env（fail-fast，禁代码兜底）——
+        # CI 冒烟显式提供 dev 占位值（suite 硬规则 §1：显式 env，非代码默认值）。
+        # lab 组合根比 saas 多组装 SSO 客户端（SaasAuthClient 镜像）→ 14 家族键全占位
+        # （2026-10-02 实测：缺任一键 RuntimeError fail-fast，本块由逐键探针得出）
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
+          JWT_SIGNING_KEY: dev-smoke-signing-key-32-bytes-minimum!
+          JWT_ISSUER: lab-management-system
+          JWT_TTL_SECONDS: "3600"
+          JWT_REFRESH_TTL_SECONDS: "86400"
+          LAB_SAAS_BASE_URL: http://localhost:5106
+          LAB_SAAS_CLIENT_ID: lab-management
+          LAB_SAAS_CLIENT_SECRET: placeholder-secret
+          LAB_SAAS_DEFAULT_TENANT_ID: "00000000-0000-0000-0000-000000000001"
+          LAB_SSO_CALLBACK_REDIRECT: /callback
+          LAB_SAAS_SERVICE_USER: placeholder
+          LAB_SAAS_SERVICE_PASSWORD: placeholder
+          LAB_SAAS_SERVICE_CLIENT_ID: placeholder
+          LAB_AUTH_DEV_PASSWORD: placeholder
+          LAB_CORS_ALLOWED_ORIGINS: http://localhost:5202
         run: python -c "from lab_management_system_fastapi.app import app; assert len(app.routes) > 0; print('ROUTES:', len(app.routes))"
