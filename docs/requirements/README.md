@@ -14,6 +14,7 @@
 | REQ-2026-006 | 批5 试验过程流（任务分配+检测记录+状态机 act 面） | P0 | 已验收 | 6 |
 | REQ-2026-007 | 批6 数据统计与 contract-test live 接入（M05 报告汇总 + 仪表盘） | P0 | 已验收 | 4 |
 | REQ-2026-008 | 后端根路径默认跳转 Swagger | P2 | 开发中 | 0 |
+| REQ-2026-009 | fastapi 部署链建设（Dockerfile + deploy 三件套 + CI deploy job） | P1 | 开发中 | 0 |
 
 ## 方向定死
 
