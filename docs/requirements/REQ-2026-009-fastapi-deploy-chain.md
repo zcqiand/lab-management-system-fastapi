@@ -1,6 +1,6 @@
 # REQ-2026-009 fastapi 部署链建设（Dockerfile + deploy 三件套 + CI deploy job）
 
-状态：开发中
+状态：已验收（2026-10-02，T-1～T-4 全闭；prod 双 tag 实航：v0.1.1 首航红根因修复→v0.1.2 全绿）
 优先级：P1
 影响功能数：0（部署基础设施，不进功能树）
 
@@ -38,6 +38,9 @@
 1. 「psycopg2 运行时依赖在 [dev] 组」——部署链发现的真实缺口：normalize_database_url
    归一成 `+psycopg2` 方言，容器内必须带驱动。处理：Dockerfile 显式
    `pip install . psycopg2-binary>=2.9`（主依赖升格另行裁定）。
+   **追记（2026-10-02 晚）**：升格已落地——首航连环事故后 sqlalchemy/psycopg2-binary/httpx
+   三包升主依赖（c1578f9 + aa3e486），Dockerfile 补丁同步删除；指纹入册
+   deploy-chain-fingerprints「fastapi 镜像只装主依赖」。
 2. prod 上线（VPS 容器 + nginx vhost + DNS）是外向动作——本 REQ 只落仓库侧物料；
    执行前主会话向用户确认变更面。
 
@@ -53,7 +56,7 @@ REQ-2026-008 §4（ADR-0027 subset invariant / 交付列收口 / infra 专属模
 | T-1 | Dockerfile（端口钉 CMD；psycopg2 运行时依赖） | ✅ |
 | T-2 | deploy/ 三件套（deploy 脚本 + nginx-vps.conf.example + setup-vps.sh，镜像 rails 仓 2026-09-03 事故修复版机制） | ✅ |
 | T-3 | ci.yml 增 deploy job（tag 触发；build&push latest+tag；appleboy/ssh-action 调 VPS 脚本） | ✅ |
-| T-4 | prod 上线 runbook（secrets/vars 清单 + 执行步骤）——待用户批准执行 | ⏳ |
+| T-4 | prod 上线 runbook（secrets/vars 清单 + 执行步骤）——待用户批准执行 | ✅（2026-10-02，用户确认并委托 GH secrets/vars 配置；主会话同日配齐 13 secrets + 2 vars（核心 8 + lab 五键 + JWT_SIGNING_KEY），值经本地 `.env.local`/家族 secret 溯源核对后写入；prod 实航闭环：v0.1.1-20261002 首航红（`impl/saas_client.py` 运行时 import httpx，httpx 原在 dev 组——同族第二例，run 37028390520）→ 全量 import 扫描补 httpx 升主依赖（aa3e486）→ v0.1.2-20261002 全绿（run 37029168792）；域名四验：`/` 307→`/docs` 200、`/health` 200、`/docs` 200——本 REQ 状态置已验收） |
 
 ## 风险与回滚
 
@@ -61,6 +64,8 @@ REQ-2026-008 §4（ADR-0027 subset invariant / 交付列收口 / infra 专属模
   VPS_HOST/VPS_USER/VPS_SSH_KEY/PG_HOST/PG_PASSWORD/JWT_SIGNING_KEY/
   LAB_SAAS_* 五键/LAB_AUTH_DEV_PASSWORD）与 vars（NGINX_DOMAIN/
   NGINX_CERT_BASENAME）已配置——缺则 deploy job fail-fast（脚本自检）。
+  **已配置（2026-10-02，用户确认并委托主会话执行）**：上列 13 secrets + 2 vars 同日落齐，
+  值经本地 `.env.local`/家族 secret 溯源核对后 `gh secret set`/`gh variable set` 写入。
 - 回滚：VPS 上 `docker run` 旧 tag 重跑 deploy 脚本；nginx vhost 渲染幂等。
 - 环境差异：本机无 docker，镜像构建验证发生在 GH Actions 首次 tag-deploy；
   脚本已过 `sh -n` + 与 rails 仓生产验证版逐段镜像。
