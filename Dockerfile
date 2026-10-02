@@ -7,9 +7,9 @@
 # 端口是家族契约（docs/conventions/multi-repo-family.md §6 X07=5207），钉死在
 # CMD 里不走 env 兜底（suite 硬规则 §1 同款口径：fail-fast，不留静默默认）。
 #
-# psycopg2-binary 在这里是显式运行时依赖：impl/config.normalize_database_url 把
-# DATABASE_URL 归一成 postgresql+psycopg2 方言，驱动必须随镜像（pyproject 主依赖
-# 暂只有 [dev] 组带它——L4 真库测试走 dev 通道；日后若升进主依赖，此处可去掉）。
+# 运行时依赖（sqlalchemy / psycopg2-binary）已升进 pyproject 主依赖（镜像 saas 仓
+# 2026-10-02 首航事故修复：sqlalchemy 只经 dev 组传递带入，镜像容器 import 即炸；
+# psycopg2 原靠本文件 build 补丁——两处一并归位主依赖，此处只装包本体）。
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -17,7 +17,7 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY src/ ./src/
 
-RUN pip install --no-cache-dir . "psycopg2-binary>=2.9"
+RUN pip install --no-cache-dir .
 
 EXPOSE 5207
 CMD ["uvicorn", "lab_management_system_fastapi.app:app", "--host", "0.0.0.0", "--port", "5207"]
