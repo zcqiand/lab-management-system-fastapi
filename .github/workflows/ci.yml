@@ -55,7 +55,7 @@ jobs:
           LAB_SAAS_SERVICE_PASSWORD: placeholder
           LAB_SAAS_SERVICE_CLIENT_ID: placeholder
           LAB_AUTH_DEV_PASSWORD: placeholder
-          LAB_CORS_ALLOWED_ORIGINS: http://localhost:5202
+          LAB_CORS_ALLOWED_ORIGINS: http://localhost:5202,http://localhost:5208
         run: python -c "from lab_management_system_fastapi.app import app; assert len(app.routes) > 0; print('ROUTES:', len(app.routes))"
 
   # 部署链（X07=5207；镜像 lab-management-system-rails deploy job，tag push 触发）:
