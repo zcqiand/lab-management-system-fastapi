@@ -79,7 +79,7 @@ if [ ! -f "$BASE/fastapi.env" ]; then
     printf 'LAB_SAAS_SERVICE_PASSWORD=%s\n' "$LAB_SAAS_SERVICE_PASSWORD"
     printf 'LAB_SAAS_SERVICE_CLIENT_ID=lab-management\n'
     printf 'LAB_AUTH_DEV_PASSWORD=%s\n' "$LAB_AUTH_DEV_PASSWORD"
-    printf 'LAB_CORS_ALLOWED_ORIGINS=https://lab-fastapi.xiangru.uk,https://lab-react.xiangru.uk,https://lab-vue.xiangru.uk,https://lab-nextjs.xiangru.uk,https://saas-react.xiangru.uk\n'
+    printf 'LAB_CORS_ALLOWED_ORIGINS=https://lab-fastapi.xiangru.uk,https://lab-react.xiangru.uk,https://lab-vue.xiangru.uk,https://lab-nextjs.xiangru.uk,https://saas-react.xiangru.uk,https://lab-flutter.xiangru.uk\n'
   } > "$BASE/fastapi.env"
   chown deploy:deploy "$BASE/fastapi.env" 2>/dev/null || true
   chmod 600 "$BASE/fastapi.env"
@@ -185,13 +185,14 @@ if [ -f "$BASE/fastapi.env" ]; then
   upsert_if_placeholder LAB_SAAS_SERVICE_PASSWORD "$LAB_SAAS_SERVICE_PASSWORD"
   upsert_if_placeholder LAB_AUTH_DEV_PASSWORD "$LAB_AUTH_DEV_PASSWORD"
 
-  # origin 级无损追加（家族同款）：lab 三前端 + saas 登录页 + 本域都可跨源调本后端，
+  # origin 级无损追加（家族同款）：lab 三前端 + saas 登录页 + flutter prod + 本域都可跨源调本后端，
   # 存量 env-file 缺哪个 origin 就补哪个（不整值覆盖，运维手工 origin 保留）。
   for cors_origin in "https://${NGINX_DOMAIN}" \
                      "https://lab-nextjs.xiangru.uk" \
                      "https://lab-react.xiangru.uk" \
                      "https://lab-vue.xiangru.uk" \
-                     "https://saas-react.xiangru.uk"; do
+                     "https://saas-react.xiangru.uk" \
+                     "https://lab-flutter.xiangru.uk"; do
     if grep -q '^LAB_CORS_ALLOWED_ORIGINS=' "$BASE/fastapi.env" && ! grep '^LAB_CORS_ALLOWED_ORIGINS=' "$BASE/fastapi.env" | grep -qF "$cors_origin"; then
       sed -i "s#^\(LAB_CORS_ALLOWED_ORIGINS=.*\)#\1,${cors_origin}#" "$BASE/fastapi.env"
       echo "→ reconcile LAB_CORS_ALLOWED_ORIGINS: 追加缺失 origin ${cors_origin}（origin 级，不整值覆盖）"
