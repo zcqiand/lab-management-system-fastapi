@@ -2,8 +2,8 @@
 
 数据 1:1 镜像 lab-msw（家族 dev 约定）：
 
-- 用户：alice / ``LAB_AUTH_DEV_PASSWORD``（USER-A，roleCode=admin）；dev 凭证与
-  saas seed（V016 alice）同源，contract-test 依赖
+- 用户：alice（USER-A，roleCode=admin）——REQ-2026-023：口令校验已代理 saas IdP，
+  本目录只承担 SSO/refresh/me 的用户与租户查找
 - 租户：TENANT-001 city-lab / TENANT-002 district-lab / TENANT-003 third-party
 - 运行时 upsert：SSO 用户按 email 键落 ``_upserted`` 内存 Map（重启即清，refresh 自愈链兜底）
 - per-user saas refresh_token：saas rotate-once 消费即作废，me/menus 缓存 miss
@@ -37,12 +37,8 @@ _TENANTS: list[MyTenant] = [
 class ConfigUserDirectory:
     """无身份表的配置式目录（ADR-0008）：查/比/upsert 全内存。"""
 
-    def __init__(self, dev_password: str) -> None:
-        if not dev_password:
-            raise RuntimeError(
-                'LAB_AUTH_DEV_PASSWORD 必填（ADR-0019 禁 "dev123456" 字面默认值，suite 硬规则 §1）'
-            )
-        self._dev_password = dev_password
+    def __init__(self) -> None:
+        # REQ-2026-023：dev 密码校验（check_password）随本地校验路径退役
         self._upserted: dict[str, CurrentUser] = {}
         self._saas_refresh_tokens: dict[str, str] = {}
 
@@ -67,9 +63,6 @@ class ConfigUserDirectory:
         if _DEMO_USER.id == user_id:
             return _DEMO_USER
         return next((u for u in self._upserted.values() if u.id == user_id), None)
-
-    def check_password(self, username: str, password: str) -> bool:
-        return _DEMO_USER.username == username and self._dev_password == password
 
     def tenants_of(self, _username: str) -> list[MyTenant]:
         # 镜像 springboot UserDirectory 接口形参：demo 目录全体用户租户一致，username 刻意不消费

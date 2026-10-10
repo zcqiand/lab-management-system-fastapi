@@ -62,6 +62,17 @@ class SaasUpstreamError(ApiError):
     code = "SAAS_UPSTREAM_ERROR"
 
 
+class SaasIdpUnavailableError(ApiError):
+    """原生登录路径 saas IdP 不可达/5xx → 502 SAAS_UNAVAILABLE（REQ-2026-023 五仓统一码）。
+
+    与 sso 路径的 SaasUpstreamError（502 SAAS_UPSTREAM_ERROR）分流：登录错误码族
+    与 nextjs/springboot/aspnetcore/rails 对齐，不透传 saas 内部详情。
+    """
+
+    status_code = 502
+    code = "SAAS_UNAVAILABLE"
+
+
 class MenusUnavailableError(ApiError):
     """菜单快照 miss（重启/TTL 过期/拉取失败）→ 503 可恢复临时态，前端回退静态菜单。"""
 

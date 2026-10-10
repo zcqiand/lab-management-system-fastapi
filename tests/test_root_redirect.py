@@ -35,7 +35,6 @@ def make_config() -> AppConfig:
         saas_service_user="alice",
         saas_service_password=DEV_PASSWORD,
         saas_service_client_id="lab-management",
-        auth_dev_password=DEV_PASSWORD,
         cors_allowed_origins="http://localhost:5201,http://localhost:5202",
     )
 

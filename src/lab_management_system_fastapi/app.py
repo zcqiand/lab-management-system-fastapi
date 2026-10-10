@@ -137,7 +137,7 @@ def create_app(config: AppConfig, engine: Engine | None = None) -> FastAPI:
     app.state.engine = db_engine
     app.state.session_factory = sessionmaker(bind=db_engine, expire_on_commit=False)
     app.state.jwt = JwtIssuer(config)
-    app.state.directory = ConfigUserDirectory(config.auth_dev_password)
+    app.state.directory = ConfigUserDirectory()
     app.state.menu_cache = MenuSnapshotCache()
     app.state.membership_cache = MembershipSnapshotCache()
     # SSO 测试缝：单测以 fake 覆盖这两个属性（REQ-2026-002 §6；saas 真连归批6 live）

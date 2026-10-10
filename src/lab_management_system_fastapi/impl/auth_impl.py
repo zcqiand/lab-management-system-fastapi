@@ -21,6 +21,7 @@ from lab_management_system_fastapi.impl.errors import (
     InvalidGrantError,
     MenusUnavailableError,
     NotFoundError,
+    SaasIdpUnavailableError,
     SaasUpstreamError,
     UnauthorizedClientError,
 )
@@ -31,7 +32,9 @@ from lab_management_system_fastapi.impl.menu_cache import (
 )
 from lab_management_system_fastapi.impl.saas_client import (
     SaasAuthClient,
+    SaasAvailableTenant,
     SaasCurrentUser,
+    SaasLoginResponse,
     SaasMeClient,
     SaasPlatformTenant,
     SaasTenantMembership,
@@ -56,6 +59,16 @@ log = logging.getLogger(__name__)
 # 密码登录缺省 refresh token 载荷（AuthService.session "dev-placeholder" 镜像：
 # dev 用户无 saas 身份，refresh 走 saas 会 4xx → 前端回密码重登）
 _DEV_PLACEHOLDER_REFRESH = "dev-placeholder"
+
+
+def _first_non_empty(*values: str | None) -> str:
+    """空串 falsy 语义的首个非空值（REQ-2026-023 映射回退链——saas user 无 displayName
+    时为空串，is-not-None 检查接不住，家族记忆 saas-no-displayname-empty-string-fallback-trap）。"""
+    for v in values:
+        if v:
+            return v
+    return ""
+
 
 # lab 家族在 saas 注册的 appCode（seeds apps.json，AuthService.LAB_APP_CODE 镜像）
 _LAB_APP_CODE = "lab-management"
@@ -88,14 +101,53 @@ class AuthApiImpl(BaseAuthApi):
         password = body.password if body is not None else ""
         if not username or not password:
             raise BadRequestError("username and password are required")
-        if not state.directory.check_password(username, password):
-            raise InvalidCredentialsError("Invalid username or password")
-        user = state.directory.find_by_username(username)
-        if user is None:
-            raise InvalidCredentialsError("Invalid username or password")
-        # 密码登录 dev 用户无 saas 身份 → 服务账号拉菜单快照；失败只 warn 不阻塞登录
+        # REQ-2026-023（2026-10-11 人裁方案 A）：账密校验代理 saas IdP——请求体账密调
+        # saas /api/v1/auth/login（clientId=LAB_SAAS_CLIENT_ID），本地 dev 密码校验路径
+        # 退役（凭据真源=saas 库）。错误映射五仓统一：saas 4xx → 401 INVALID_CREDENTIALS
+        # （不透传）；5xx/不可达 → 502 SAAS_UNAVAILABLE。
+        saas_login = self._proxy_saas_login(state, username, password)
+        saas_user = saas_login.user
+        # saas user 无 displayName、availableTenants 无租户名 → 瞬时持 accessToken 拉
+        # 平台租户列表富化（best-effort，失败降级 name=tenantId）
+        tenants = self._tenants_from_login(
+            saas_login.available_tenants,
+            self._fetch_tenant_names(
+                state,
+                saas_login.user_id or (saas_user.id if saas_user is not None else ""),
+                saas_login.access_token,
+            ),
+        )
+        user = CurrentUser(
+            id=_first_non_empty(
+                saas_user.id if saas_user is not None else None,
+                saas_login.user_id,
+                "unknown",
+            ),
+            username=_first_non_empty(
+                saas_user.username if saas_user is not None else None,
+                saas_user.email if saas_user is not None else None,
+                "unknown",
+            ),
+            displayName=_first_non_empty(
+                saas_user.display_name if saas_user is not None else None,
+                saas_user.username if saas_user is not None else None,
+                saas_user.email if saas_user is not None else None,
+                "未知用户",
+            ),
+            roleCode=(tenants[0].role_ids[0] if tenants and tenants[0].role_ids else "member"),
+        )
+        # 密码登录用户不透传 saas refreshToken → 仍用服务账号拉菜单快照
+        # （REQ-2026-023 非目标，行为不动：失败不阻塞登录，miss 时 menus 503）
         self._cache_menus_with_service_account(user.id)
-        return self._session(state, user, None, None, None)
+        # lab 自家 JWT 重签（tenant_id=saas currentTenantId ?? 首租户）；
+        # refresh 维持 dev-placeholder（session 第 5 参 None，不透传 saas refreshToken）
+        return self._session(
+            state,
+            user,
+            saas_login.current_tenant_id or (tenants[0].tenant_id if tenants else None),
+            tenants,
+            None,
+        )
 
     async def auth_native_login(self, login_request: LoginRequest) -> LoginResponse:
         # springboot AuthController native-login 直通 service.login（同源非浏览器通道）
@@ -297,6 +349,40 @@ class AuthApiImpl(BaseAuthApi):
         if found is not None:
             return found
         return directory.upsert(saas_user.id, saas_user.email, saas_user.display_name, "viewer")
+
+    def _proxy_saas_login(
+        self, state: _AppState, username: str, password: str
+    ) -> SaasLoginResponse:
+        """账密代理出站（REQ-2026-023）。错误归类：saas 4xx → 401（不透传 saas 内部码）；
+        5xx/连接失败 → SaasIdpUnavailableError（502 SAAS_UNAVAILABLE）。"""
+        try:
+            return state.saas_auth.user_login(username, password)
+        except (InvalidGrantError, UnauthorizedClientError) as exc:
+            raise InvalidCredentialsError("Invalid username or password") from exc
+        except SaasUpstreamError as exc:
+            raise SaasIdpUnavailableError(f"saas IdP unavailable: {exc.message}") from exc
+
+    def _tenants_from_login(
+        self,
+        available_tenants: list[SaasAvailableTenant],
+        name_by_id: dict[str, SaasPlatformTenant],
+    ) -> list[MyTenant]:
+        """userLogin availableTenants → MyTenant（REQ-2026-023）：过滤无 tenantId/removed；
+        富化 miss 降级 code=name=tenantId（与 _tenants_from 同语义）。"""
+        tenants: list[MyTenant] = []
+        for t in available_tenants:
+            if not t.tenant_id or t.status == "removed":
+                continue
+            n = name_by_id.get(t.tenant_id)
+            tenants.append(
+                MyTenant(
+                    tenantId=t.tenant_id,
+                    code=n.tenant_key if n is not None and n.tenant_key else t.tenant_id,
+                    name=n.name if n is not None and n.name else t.tenant_id,
+                    roleIds=list(t.role_ids),
+                )
+            )
+        return tenants
 
     def _cache_menus_with_service_account(self, user_id: str) -> None:
         """密码登录路径：服务账号登 saas 换 token 拉 /me/menus；失败只 warn（菜单不阻塞登录）。"""

@@ -79,6 +79,40 @@ class SaasPlatformTenant(_SaasModel):
     tenant_key: str | None = Field(default=None, alias="tenantKey")
 
 
+class SaasLoginUser(_SaasModel):
+    """saas POST /api/v1/auth/login 响应 user 段（REQ-2026-023）。
+
+    saas 侧 displayName 可为空串——回退链必须 falsy 语义（``or``/``if v``），不能
+    is-not-None 判断（家族记忆 saas-no-displayname-empty-string-fallback-trap）。
+    """
+
+    id: str
+    username: str | None = None
+    email: str | None = None
+    display_name: str | None = Field(default=None, alias="displayName")
+
+
+class SaasAvailableTenant(_SaasModel):
+    """userLogin 响应 availableTenants 行：只有 tenantId+roleIds，无租户名。"""
+
+    tenant_id: str = Field(alias="tenantId")
+    role_ids: list[str] = Field(default_factory=list, alias="roleIds")
+    status: str | None = None
+
+
+class SaasLoginResponse(_SaasModel):
+    """saas POST /api/v1/auth/login 响应全形（REQ-2026-023 登录代理出站）。"""
+
+    user: SaasLoginUser | None = None
+    available_tenants: list[SaasAvailableTenant] = Field(
+        default_factory=list, alias="availableTenants"
+    )
+    access_token: str = Field(alias="accessToken")
+    refresh_token: str = Field(default="", alias="refreshToken")
+    user_id: str | None = Field(default=None, alias="userId")
+    current_tenant_id: str | None = Field(default=None, alias="currentTenantId")
+
+
 def _truncate(text: str, max_len: int = 200) -> str:
     if len(text) <= max_len:
         return text
@@ -104,9 +138,24 @@ class SaasAuthClient:
     def __init__(self, config: AppConfig) -> None:
         self._config = config
 
+    def user_login(self, username: str, password: str) -> SaasLoginResponse:
+        """原生登录账密校验出站（REQ-2026-023）：请求体账密原值透传，
+        clientId=OAuth client id（LAB_SAAS_CLIENT_ID）——与 service_login 的
+        LAB_SAAS_SERVICE_CLIENT_ID 分流。"""
+        payload = self._request_json(
+            "/api/v1/auth/login",
+            json_body={
+                "username": username,
+                "password": password,
+                "clientId": self._config.saas_client_id,
+            },
+            endpoint="auth/login",
+        )
+        return SaasLoginResponse.model_validate(payload)
+
     def service_login(self) -> TokenResponse:
-        """服务账号登录（lab 密码登录的 dev 用户无 saas 身份，借它拉 /me/menus 快照）。"""
-        return self._post(
+        """服务账号登录（密码登录用户菜单快照路径，REQ-2026-023 非目标不动）。"""
+        payload = self._request_json(
             "/api/v1/auth/login",
             json_body={
                 "username": self._config.saas_service_user,
@@ -115,6 +164,7 @@ class SaasAuthClient:
             },
             endpoint="auth/login",
         )
+        return self._token_from(payload, "auth/login")
 
     def token(
         self,
@@ -136,9 +186,13 @@ class SaasAuthClient:
             body["refreshToken"] = refresh_token
         if redirect_uri is not None:
             body["redirectUri"] = redirect_uri
-        return self._post("/api/v1/oauth/token", json_body=body, endpoint="oauth/token")
+        payload = self._request_json("/api/v1/oauth/token", json_body=body, endpoint="oauth/token")
+        return self._token_from(payload, "oauth/token")
 
-    def _post(self, path: str, json_body: dict[str, str], endpoint: str) -> TokenResponse:
+    def _request_json(
+        self, path: str, json_body: dict[str, str], endpoint: str
+    ) -> dict[str, object]:
+        """POST 出站公共段：连接失败/4xx/5xx 归类（镜像 springboot），返回解析 dict。"""
         try:
             resp = httpx.request(
                 "POST",
@@ -151,7 +205,13 @@ class SaasAuthClient:
         if resp.status_code >= 400:
             _raise_for_saas_status(resp.status_code, resp.text, endpoint)
         payload = resp.json()
-        if not isinstance(payload, dict) or "accessToken" not in payload:
+        if not isinstance(payload, dict):
+            raise SaasUpstreamError(f"saas {endpoint} unexpected payload shape")
+        return payload
+
+    @staticmethod
+    def _token_from(payload: dict[str, object], endpoint: str) -> TokenResponse:
+        if "accessToken" not in payload:
             raise SaasUpstreamError(f"saas {endpoint} unexpected payload shape")
         return TokenResponse(
             access_token=str(payload["accessToken"]),

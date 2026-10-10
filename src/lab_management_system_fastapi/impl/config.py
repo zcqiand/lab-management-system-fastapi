@@ -47,7 +47,6 @@ class AppConfig:
     saas_service_user: str
     saas_service_password: str
     saas_service_client_id: str
-    auth_dev_password: str
     cors_allowed_origins: str
 
     @property
@@ -79,6 +78,5 @@ class AppConfig:
             saas_service_user=_require_env("LAB_SAAS_SERVICE_USER"),
             saas_service_password=_require_env("LAB_SAAS_SERVICE_PASSWORD"),
             saas_service_client_id=_require_env("LAB_SAAS_SERVICE_CLIENT_ID"),
-            auth_dev_password=_require_env("LAB_AUTH_DEV_PASSWORD"),
             cors_allowed_origins=_require_env("LAB_CORS_ALLOWED_ORIGINS"),
         )

@@ -18,6 +18,7 @@ from lab_management_system_fastapi.impl.config import AppConfig
 from lab_management_system_fastapi.impl.errors import InvalidGrantError
 from lab_management_system_fastapi.impl.saas_client import (
     SaasCurrentUser,
+    SaasLoginResponse,
     SaasMenuNode,
     SaasPlatformTenant,
     SaasTenantMembership,
@@ -49,17 +50,43 @@ def make_config() -> AppConfig:
         saas_service_user="alice",
         saas_service_password=DEV_PASSWORD,
         saas_service_client_id="lab-management",
-        auth_dev_password=DEV_PASSWORD,
         cors_allowed_origins="http://localhost:5201,http://localhost:5202",
     )
 
 
 class FakeSaasAuth:
-    """saas /api/v1/auth/login + /api/v1/oauth/token 替身（形状对齐 SaasAuthClient）。"""
+    """saas /api/v1/auth/login + /api/v1/oauth/token 替身（形状对齐 SaasAuthClient）。
+
+    user_login（REQ-2026-023 登录代理出站）demo 形：alice→USER-A、三 demo 租户；
+    user_login_failure 注错走 saas 4xx → 401 映射路径。
+    """
 
     def __init__(self) -> None:
         self.token_calls: list[dict[str, str | None]] = []
+        self.user_login_failure: Exception | None = None
         self._n = 0
+
+    def user_login(self, username: str, _password: str) -> SaasLoginResponse:
+        if self.user_login_failure is not None:
+            raise self.user_login_failure
+        return SaasLoginResponse.model_validate(
+            {
+                "user": {
+                    "id": "USER-A",
+                    "username": username,
+                    "email": "alice@saas.local",
+                    "displayName": "管理员",
+                },
+                "availableTenants": [
+                    {"tenantId": "TENANT-001", "roleIds": ["admin"], "status": "active"},
+                    {"tenantId": "TENANT-002", "roleIds": ["technician"], "status": "active"},
+                    {"tenantId": "TENANT-003", "roleIds": ["viewer"], "status": "active"},
+                ],
+                "accessToken": "user-access-token",
+                "refreshToken": "user-refresh-token",
+                "userId": "USER-A",
+            }
+        )
 
     def service_login(self) -> TokenResponse:
         return TokenResponse(access_token="svc-access", refresh_token="svc-refresh")
@@ -182,7 +209,8 @@ def test_login_ok(app_client: TestClient) -> None:
     }
     access = decode(body["token"])
     assert access["typ"] == "access" and access["sub"] == "USER-A"
-    assert "tenant_id" not in access  # 无选租户登录不带 claim（LabJwtSigner.issue 镜像）
+    # REQ-2026-023：tenant_id=saas currentTenantId ?? 首租户（代理化后登录即带 claim）
+    assert access["tenant_id"] == "TENANT-001"
     refresh = decode(body["refreshToken"])
     assert refresh["typ"] == "refresh" and refresh["saas_refresh_token"] == "dev-placeholder"
 
@@ -199,6 +227,9 @@ def test_login_native_same_path(app_client: TestClient) -> None:
 
 @pytest.mark.fn("M01.F05.I01")
 def test_login_bad_password_401(app_client: TestClient) -> None:
+    # REQ-2026-023：校验代理 saas IdP——saas 4xx（口令错）→ 401 INVALID_CREDENTIALS
+    saas_auth: FakeSaasAuth = app_client.app.state.saas_auth
+    saas_auth.user_login_failure = InvalidGrantError('saas 400 {"error":"invalid_grant"}')
     resp = app_client.post("/api/auth/login", json={"username": "alice", "password": "wrong"})
     assert resp.status_code == 401
     assert resp.json()["code"] == "INVALID_CREDENTIALS"
