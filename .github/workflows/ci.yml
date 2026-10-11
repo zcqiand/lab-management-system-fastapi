@@ -54,7 +54,6 @@ jobs:
           LAB_SAAS_SERVICE_USER: placeholder
           LAB_SAAS_SERVICE_PASSWORD: placeholder
           LAB_SAAS_SERVICE_CLIENT_ID: placeholder
-          LAB_AUTH_DEV_PASSWORD: placeholder
           LAB_CORS_ALLOWED_ORIGINS: http://localhost:5202,http://localhost:5208
         run: python -c "from lab_management_system_fastapi.app import app; assert len(app.routes) > 0; print('ROUTES:', len(app.routes))"
 
@@ -102,14 +101,13 @@ jobs:
           LAB_SAAS_DEFAULT_TENANT_ID: ${{ secrets.LAB_SAAS_DEFAULT_TENANT_ID }}
           LAB_SAAS_SERVICE_USER: ${{ secrets.LAB_SAAS_SERVICE_USER }}
           LAB_SAAS_SERVICE_PASSWORD: ${{ secrets.LAB_SAAS_SERVICE_PASSWORD }}
-          LAB_AUTH_DEV_PASSWORD: ${{ secrets.LAB_AUTH_DEV_PASSWORD }}
           NGINX_DOMAIN: ${{ vars.NGINX_DOMAIN }}
           NGINX_CERT_BASENAME: ${{ vars.NGINX_CERT_BASENAME }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: PG_HOST,PG_PASSWORD,JWT_SIGNING_KEY,LAB_SAAS_CLIENT_SECRET,LAB_SAAS_DEFAULT_TENANT_ID,LAB_SAAS_SERVICE_USER,LAB_SAAS_SERVICE_PASSWORD,LAB_AUTH_DEV_PASSWORD,NGINX_DOMAIN,NGINX_CERT_BASENAME
+          envs: PG_HOST,PG_PASSWORD,JWT_SIGNING_KEY,LAB_SAAS_CLIENT_SECRET,LAB_SAAS_DEFAULT_TENANT_ID,LAB_SAAS_SERVICE_USER,LAB_SAAS_SERVICE_PASSWORD,NGINX_DOMAIN,NGINX_CERT_BASENAME
           script: |
             # 自举: 首次部署无 /home/deploy/<repo>/ 时自动建 + 拉 deploy 脚本
             set -e

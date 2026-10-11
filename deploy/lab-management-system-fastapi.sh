@@ -43,8 +43,8 @@ if [ -z "${LAB_SAAS_SERVICE_USER:-}" ] || [ -z "${LAB_SAAS_SERVICE_PASSWORD:-}" 
   echo "ERROR: LAB_SAAS_SERVICE_USER/LAB_SAAS_SERVICE_PASSWORD secrets required (菜单快照服务账号，禁 dev 兜底)" >&2
   exit 1
 fi
-if [ -z "${PG_PASSWORD:-}" ] || [ -z "${JWT_SIGNING_KEY:-}" ] || [ -z "${LAB_SAAS_CLIENT_SECRET:-}" ] || [ -z "${LAB_AUTH_DEV_PASSWORD:-}" ]; then
-  echo "ERROR: PG_PASSWORD / JWT_SIGNING_KEY / LAB_SAAS_CLIENT_SECRET / LAB_AUTH_DEV_PASSWORD secrets required" >&2
+if [ -z "${PG_PASSWORD:-}" ] || [ -z "${JWT_SIGNING_KEY:-}" ] || [ -z "${LAB_SAAS_CLIENT_SECRET:-}" ]; then
+  echo "ERROR: PG_PASSWORD / JWT_SIGNING_KEY / LAB_SAAS_CLIENT_SECRET secrets required" >&2
   exit 1
 fi
 
@@ -78,7 +78,6 @@ if [ ! -f "$BASE/fastapi.env" ]; then
     printf 'LAB_SAAS_SERVICE_USER=%s\n' "$LAB_SAAS_SERVICE_USER"
     printf 'LAB_SAAS_SERVICE_PASSWORD=%s\n' "$LAB_SAAS_SERVICE_PASSWORD"
     printf 'LAB_SAAS_SERVICE_CLIENT_ID=lab-management\n'
-    printf 'LAB_AUTH_DEV_PASSWORD=%s\n' "$LAB_AUTH_DEV_PASSWORD"
     printf 'LAB_CORS_ALLOWED_ORIGINS=https://lab-fastapi.xiangru.uk,https://lab-react.xiangru.uk,https://lab-vue.xiangru.uk,https://lab-nextjs.xiangru.uk,https://saas-react.xiangru.uk,https://lab-flutter.xiangru.uk\n'
   } > "$BASE/fastapi.env"
   chown deploy:deploy "$BASE/fastapi.env" 2>/dev/null || true
@@ -183,7 +182,13 @@ if [ -f "$BASE/fastapi.env" ]; then
   upsert_if_placeholder LAB_SAAS_CLIENT_SECRET "$LAB_SAAS_CLIENT_SECRET"
   upsert_if_placeholder LAB_SAAS_SERVICE_USER "$LAB_SAAS_SERVICE_USER"
   upsert_if_placeholder LAB_SAAS_SERVICE_PASSWORD "$LAB_SAAS_SERVICE_PASSWORD"
-  upsert_if_placeholder LAB_AUTH_DEV_PASSWORD "$LAB_AUTH_DEV_PASSWORD"
+  # REQ-2026-023（2026-10-11）死键清理:LAB_AUTH_DEV_PASSWORD 随原生登录代理
+  # saas IdP 退役(凭据真源=saas 库),存量 env-file 残留行删除。
+  if grep -q '^LAB_AUTH_DEV_PASSWORD=' "$BASE/fastapi.env"; then
+    echo "→ drop dead key LAB_AUTH_DEV_PASSWORD from $BASE/fastapi.env (REQ-2026-023 原生登录代理 saas)"
+    umask 077
+    sed -i '/^LAB_AUTH_DEV_PASSWORD=/d' "$BASE/fastapi.env"
+  fi
 
   # origin 级无损追加（家族同款）：lab 三前端 + saas 登录页 + flutter prod + 本域都可跨源调本后端，
   # 存量 env-file 缺哪个 origin 就补哪个（不整值覆盖，运维手工 origin 保留）。
