@@ -139,6 +139,17 @@ class AuthApiImpl(BaseAuthApi):
         # 密码登录用户不透传 saas refreshToken → 仍用服务账号拉菜单快照
         # （REQ-2026-023 非目标，行为不动：失败不阻塞登录，miss 时 menus 503）
         self._cache_menus_with_service_account(user.id)
+        # REQ-2026-023 live 回归（2026-10-11 五目标 401 指纹）：密码登录用户落
+        # membership 快照 + directory（镜像 ssoCallback 链）——me/switch 的
+        # _resolve_user 按 sub=saas user id 解析，不落目录必 unknown user 401；
+        # me/switch 归属校验吃快照。email 缺失降级 username 作 upsert 键。
+        state.membership_cache.put(user.id, tenants)
+        state.directory.upsert(
+            user.id,
+            _first_non_empty(saas_user.email if saas_user is not None else None, user.username),
+            user.display_name,
+            user.role_code,
+        )
         # lab 自家 JWT 重签（tenant_id=saas currentTenantId ?? 首租户）；
         # refresh 维持 dev-placeholder（session 第 5 参 None，不透传 saas refreshToken）
         return self._session(
@@ -165,21 +176,21 @@ class AuthApiImpl(BaseAuthApi):
         state = self._state()
         claims = require_bearer(get_context(), state.jwt)
         user = self._resolve_user(state.directory, claims)
-        saas_refresh = state.directory.get_saas_refresh_token(user.id)
-        if saas_refresh:
-            # SSO 用户必须返回 saas memberships 体系（跨体系失配防御）；miss 401 走 refresh 自愈
-            cached_tenants = state.membership_cache.get(user.id)
-            if cached_tenants is None:
-                raise InvalidCredentialsError(
-                    "membership snapshot unavailable for user "
-                    f"{user.id} (cache miss); refresh required"
-                )
+        # REQ-2026-023 live 回归：快照 hit 优先（SSO 与密码登录用户同链——密码登录
+        # 也在 login 时点填快照）；miss 且持 saas refresh（SSO 用户）→ refresh required
+        # 自愈；miss 且无 refresh（密码登录用户）→ demo 目录降级。
+        cached_tenants = state.membership_cache.get(user.id)
+        if cached_tenants is not None:
             tenant_claim = claims.get("tenant_id")
             current_tenant_id = (
                 str(tenant_claim) if tenant_claim is not None else cached_tenants[0].tenant_id
             )
             return CurrentUserSession(
                 user=user, tenants=cached_tenants, currentTenantId=current_tenant_id
+            )
+        if state.directory.get_saas_refresh_token(user.id):
+            raise InvalidCredentialsError(
+                f"membership snapshot unavailable for user {user.id} (cache miss); refresh required"
             )
         tenant_claim = claims.get("tenant_id")
         current_tenant_id = (
@@ -200,10 +211,16 @@ class AuthApiImpl(BaseAuthApi):
         claims = require_bearer(get_context(), state.jwt)
         user = self._resolve_user(state.directory, claims)
         tenant_id = switch_tenant_request.tenant_id if switch_tenant_request is not None else ""
-        target = state.directory.find_by_tenant_id(tenant_id)
+        # REQ-2026-023 live 回归：归属=用户当前会话的租户集（membership 快照，
+        # login/sso/refresh 写入），demo 目录只作快照 miss 兜底——写死 demo 字面量
+        # 会把 saas UUID 租户 404。命中换发（tenant_id=目标租户），响应租户同源。
+        known_tenants = state.membership_cache.get(user.id) or state.directory.tenants_of(
+            user.username
+        )
+        target = next((t for t in known_tenants if t.tenant_id == tenant_id), None)
         if target is None:
             raise NotFoundError("Tenant not found")
-        return self._session(state, user, target.tenant_id, None, None)
+        return self._session(state, user, target.tenant_id, known_tenants, None)
 
     # === M01.F04.I01 动态菜单（AuthService.menus 镜像：miss 503，demo 兜底已删口径） ===
 

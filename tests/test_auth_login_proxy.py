@@ -173,6 +173,71 @@ def test_login_saas_unavailable_is_502_saas_unavailable() -> None:
     assert resp.json()["code"] == "SAAS_UNAVAILABLE"
 
 
+# === REQ-2026-023 live 回归（2026-10-11 五目标同时失败指纹） ===
+# 现场：登录 sub=saas user id / tenant_id claim=saas 租户，但登录链不落
+# directory upsert + membership 快照 → me/switch 的 _resolve_user 报
+# unknown user 401；switch 归属校验写死 demo 字面量 → saas 租户 404。
+# 契约：登录后 me/switch 必须与登录响应同一租户体系（2026-09-03 对齐约束：
+# tenants.find(activeTenantId) 必命中）。
+
+UUID_USER = "00000000-0000-0000-0000-b00000000001"
+
+
+class UuidSaasAuth(RecordingSaasAuth):
+    """live 回归替身：saas 真实租户是 UUID 形（live 实测），刻意不用 TEN-1 形——
+    会与 demo 目录撞键掩盖失配（本测试的存在理由）。"""
+
+    def user_login(self, username: str, password: str) -> SaasLoginResponse:
+        self.calls.append((username, password))
+        if self.failure is not None:
+            raise self.failure
+        return SaasLoginResponse.model_validate(
+            {
+                "user": {"id": UUID_USER, "username": "alice", "email": "alice@saas.local"},
+                "availableTenants": [
+                    {
+                        "tenantId": "00000000-0000-0000-0000-000000000001",
+                        "roleIds": ["admin"],
+                        "status": "active",
+                    },
+                    {
+                        "tenantId": "00000000-0000-0000-0000-000000000002",
+                        "roleIds": ["technician"],
+                        "status": "active",
+                    },
+                ],
+                "accessToken": "u-at",
+                "refreshToken": "u-rt",
+                "userId": UUID_USER,
+            }
+        )
+
+
+@pytest.mark.fn("M00.F01.I01", "M00.F02.I01")
+def test_login_session_coherence_me_and_switch_stay_in_saas_tenant_system() -> None:
+    client = make_client(UuidSaasAuth())
+    resp = client.post("/api/auth/login", json={"username": "alice", "password": "pw-123"})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    tid = body["tenants"][0]["tenantId"]
+    assert tid == "00000000-0000-0000-0000-000000000001"
+    bearer = {"Authorization": f"Bearer {body['token']}"}
+
+    # me：resolve_user 必须能解析密码登录签发的 sub；租户与登录响应同体系
+    me = client.get("/api/auth/me", headers=bearer)
+    assert me.status_code == 200, me.text
+    me_body = me.json()
+    assert me_body["tenants"][0]["tenantId"] == tid
+    assert len(me_body["tenants"]) == len(body["tenants"])
+
+    # switch-tenant：登录响应里的租户可切 → 200 + 3 段真 JWT（tenant_id=目标租户）
+    switched = client.post("/api/auth/switch-tenant", json={"tenantId": tid}, headers=bearer)
+    assert switched.status_code == 200, switched.text
+    switched_body = switched.json()
+    assert len(switched_body["token"].split(".")) == 3
+    assert _decode(switched_body["token"])["tenant_id"] == tid
+
+
 @pytest.mark.fn("M01.F05.I01")
 def test_saas_client_user_login_sends_oauth_client_id(monkeypatch: pytest.MonkeyPatch) -> None:
     """出站 body clientId=OAuth client id（LAB_SAAS_CLIENT_ID），不是 service_client_id。"""
