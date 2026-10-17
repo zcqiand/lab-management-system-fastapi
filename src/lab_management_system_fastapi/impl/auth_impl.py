@@ -182,8 +182,11 @@ class AuthApiImpl(BaseAuthApi):
         cached_tenants = state.membership_cache.get(user.id)
         if cached_tenants is not None:
             tenant_claim = claims.get("tenant_id")
+            # 空快照回退 ""（空即空，禁 demo 兜底；终审 I2 家族级修复——[0] 空列表 IndexError）
             current_tenant_id = (
-                str(tenant_claim) if tenant_claim is not None else cached_tenants[0].tenant_id
+                str(tenant_claim)
+                if tenant_claim is not None
+                else (cached_tenants[0].tenant_id if cached_tenants else "")
             )
             return CurrentUserSession(
                 user=user, tenants=cached_tenants, currentTenantId=current_tenant_id

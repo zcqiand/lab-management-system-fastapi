@@ -270,3 +270,42 @@ def test_saas_client_user_login_sends_oauth_client_id(monkeypatch: pytest.Monkey
         "clientId": "oauth-client-id",
     }
     assert resp.user is not None and resp.user.username == "alice"
+
+
+# === 终审 I2 家族级修复：me 空租户快照空态（kotlin AuthSessionTest 同源镜像） ===
+
+
+class ZeroTenantSaasAuth(RecordingSaasAuth):
+    """零 active 租户用户：快照空列表 + token 无 tenant_id claim（oscar 非 alice）。"""
+
+    def user_login(self, username: str, password: str) -> SaasLoginResponse:
+        self.calls.append((username, password))
+        if self.failure is not None:
+            raise self.failure
+        return SaasLoginResponse.model_validate(
+            {
+                "user": {
+                    "id": "saas-user-oscar",
+                    "username": "oscar",
+                    "email": "oscar@saas.local",
+                },
+                "availableTenants": [],
+                "accessToken": "u-at",
+                "refreshToken": "u-rt",
+                "userId": "saas-user-oscar",
+            }
+        )
+
+
+@pytest.mark.fn("M00.F01.I01")
+def test_me_empty_membership_snapshot_is_empty_current_tenant_not_500() -> None:
+    # 空即空（tenants=[] + currentTenantId=""，禁 demo 兜底），非 IndexError → 500
+    client = make_client(ZeroTenantSaasAuth())
+    login = client.post("/api/auth/login", json={"username": "oscar", "password": "pw"})
+    assert login.status_code == 200, login.text
+    token = login.json()["token"]
+    resp = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["tenants"] == []
+    assert body["currentTenantId"] == ""
