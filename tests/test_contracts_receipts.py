@@ -113,7 +113,7 @@ def test_contracts_crud_roundtrip(db_client: TestClient, bearer: str) -> None:
     assert row["id"].startswith("C-")
     assert row["contractCode"] == "C-001"
     assert row["status"] == "active"  # status 缺省镜像
-    assert row["tenantId"] == "TENANT-001"
+    assert row["tenantId"] == "city-lab"
 
     got = db_client.get(f"/api/contracts/{row['id']}", headers=headers)
     assert got.status_code == _OK, got.text

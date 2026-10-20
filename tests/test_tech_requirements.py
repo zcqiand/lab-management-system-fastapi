@@ -1,9 +1,9 @@
 """批2 技术要求 red-first（M06.F06.I01）：业务三键 + tenant 收口，平台裸 List。
 
 镜像 lab-springboot TechnicalRequirementService + currentTenantIdOrDefault()：
-claim tenant_id 非空用之，否则 directory 默认租户 TENANT-001（目录配置非字面量
-兜底，ADR-0019 合规）。种子：同三键双租户行（TENANT-001 verified min30 /
-TENANT-002 draft min25）。
+claim tenant_id 非空用之，否则 directory 默认租户（目录配置非字面量兜底，
+ADR-0019 合规）。种子：同三键双租户行（city-lab verified min30 —— 登录链富化
+tenant_key，2026-10-20 人裁 / TENANT-002 draft min25，降级原 ID）。
 
 契约差异点（REQ 澄清记录，2026-10-01 批6 CT live 修正）：springboot Mapper 缺省
 comparison=RequirementComparison.u，wire 值是 "≥"（u/u2 是 Java 枚举对 ≥/≤ 的
@@ -42,9 +42,9 @@ def test_list_bare_array_and_filters(db_client: TestClient, bearer: str) -> None
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert isinstance(body, list)  # 裸 List
-    assert len(body) == 1  # alice 无 tenant claim → TENANT-001 → 只见 verified 行
+    assert len(body) == 1  # alice claim tenant_id=city-lab（tenant_key）→ 只见 verified 行
     row = body[0]
-    assert row["tenantId"] == "TENANT-001"
+    assert row["tenantId"] == "city-lab"
     assert row["verificationStatus"] == "verified"
     assert row["minValue"] == 30
     assert row["comparison"] == "≥"
@@ -92,10 +92,10 @@ def test_list_bare_array_and_filters(db_client: TestClient, bearer: str) -> None
 
 @pytest.mark.fn("M06.F06.I01")
 def test_tenant_isolation_and_default_tenant_fallback(db_client: TestClient, bearer: str) -> None:
-    # 默认租户：无 claim → TENANT-001
+    # claim tenant_id=city-lab（登录富化 tenant_key，2026-10-20 人裁）
     resp = db_client.get(_TRIPLE, headers=_auth(db_client, bearer))
     assert resp.status_code == 200
-    assert resp.json()["tenantId"] == "TENANT-001"
+    assert resp.json()["tenantId"] == "city-lab"
     # 切换租户 → TENANT-002 行（draft min25，异三键：PG PK 三键下同三键
     # 跨租户不可并存——REQ 澄清记录）
     token2 = _switch(db_client, bearer, "TENANT-002")
@@ -106,7 +106,7 @@ def test_tenant_isolation_and_default_tenant_fallback(db_client: TestClient, bea
     assert body[0]["inspectionParameterCode"] == "PAR-B"
     assert body[0]["minValue"] == 25
     assert body[0]["verificationStatus"] == "draft"
-    # tenant 隔离：TENANT-002 看不见 TENANT-001 的同三键行 → 404
+    # tenant 隔离：TENANT-002 看不见 city-lab 的同三键行 → 404
     resp = db_client.get(_TRIPLE, headers=_auth(db_client, token2))
     assert resp.status_code == 404
 
@@ -155,7 +155,7 @@ def test_create_defaults_and_comparison_default(db_client: TestClient, bearer: s
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert body["tenantId"] == "TENANT-001"  # 落 directory 默认租户
+    assert body["tenantId"] == "city-lab"  # 落 claim 租户（city-lab）
     assert body["valueType"] == "numeric"
     assert body["judgmentMode"] == "manual"
     assert body["verificationStatus"] == "draft"
@@ -179,7 +179,7 @@ def test_update_partial_and_missing_404(db_client: TestClient, bearer: str) -> N
     assert body["minValue"] == 35
     assert body["valueType"] == "numeric"  # 未提及字段不动
     assert body["comparison"] == "≥"
-    assert body["tenantId"] == "TENANT-001"
+    assert body["tenantId"] == "city-lab"
     resp = db_client.put(
         "/api/technical-requirements/OBJ-01/PAR-A/STD-2",
         json={"minValue": 1},

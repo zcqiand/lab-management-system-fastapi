@@ -130,14 +130,15 @@ def test_login_proxies_saas_and_resigns_lab_jwt() -> None:
         "roleCode": "admin",
     }
     # tenants 四字段 + 富化真名/tenantKey（TEN-2 不在平台列表 → 降级 tenantId）
+    # 2026-10-20 租户标识=tenant_key（人裁「对外交互用 key」）：命中租户 tenantId=tenantKey
     assert body["tenants"] == [
-        {"tenantId": "TEN-1", "code": "city", "name": "市检测中心", "roleIds": ["admin"]},
+        {"tenantId": "city", "code": "city", "name": "市检测中心", "roleIds": ["admin"]},
         {"tenantId": "TEN-2", "code": "TEN-2", "name": "TEN-2", "roleIds": ["technician"]},
     ]
-    # lab 自家 JWT 重签：tenant_id=首租户
+    # lab 自家 JWT 重签：tenant_id=首租户（tenant_key）
     access = _decode(body["token"])
     assert access["sub"] == "saas-user-alice"
-    assert access["tenant_id"] == "TEN-1"
+    assert access["tenant_id"] == "city"
     # refresh 维持 dev-placeholder（不透传 saas refreshToken）
     refresh = _decode(body["refreshToken"])
     assert refresh["saas_refresh_token"] == "dev-placeholder"

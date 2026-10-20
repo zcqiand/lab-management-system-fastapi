@@ -385,7 +385,8 @@ def _seed(conn: Any) -> None:
         InspectionTechnicalRequirements: [
             # 双租户异三键行（PG PK=三键，同三键跨租户不可并存——schema 事实，
             # springboot TechnicalRequirementKey 四部件在 PG 侧不可表达）：
-            # TENANT-001 verified min30 @ PAR-A / TENANT-002 draft min25 @ PAR-B
+            # city-lab verified min30 @ PAR-A（TENANT-001 经登录链富化为 tenant_key，
+            # 2026-10-20 人裁）/ TENANT-002 draft min25 @ PAR-B（不在平台列表降级原 ID）
             {
                 "inspection_object_code": OBJ1,
                 "inspection_parameter_code": PAR_A,
@@ -394,7 +395,7 @@ def _seed(conn: Any) -> None:
                 "comparison": "≥",
                 "judgment_mode": "manual",
                 "verification_status": "verified",
-                "tenant_id": "TENANT-001",
+                "tenant_id": "city-lab",
                 "conditions": None,
                 "min_value": 30,
                 "max_value": None,

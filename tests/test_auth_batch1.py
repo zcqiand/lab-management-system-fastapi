@@ -200,17 +200,19 @@ def test_login_ok(app_client: TestClient) -> None:
         "displayName": "管理员",
         "roleCode": "admin",
     }
-    assert {t["tenantId"] for t in body["tenants"]} == {"TENANT-001", "TENANT-002", "TENANT-003"}
+    # 2026-10-20 租户标识=tenant_key（人裁「对外交互用 key」）：命中租户 tenantId=city-lab；
+    # TENANT-002/003 不在平台列表 → 降级原 tenantId
+    assert {t["tenantId"] for t in body["tenants"]} == {"city-lab", "TENANT-002", "TENANT-003"}
     assert body["tenants"][0] == {
-        "tenantId": "TENANT-001",
+        "tenantId": "city-lab",
         "code": "city-lab",
         "name": "市住建工程质量检测中心",
         "roleIds": ["admin"],
     }
     access = decode(body["token"])
     assert access["typ"] == "access" and access["sub"] == "USER-A"
-    # REQ-2026-023：tenant_id=saas currentTenantId ?? 首租户（代理化后登录即带 claim）
-    assert access["tenant_id"] == "TENANT-001"
+    # REQ-2026-023：tenant_id=saas currentTenantId ?? 首租户（tenant_key 人裁后=key）
+    assert access["tenant_id"] == "city-lab"
     refresh = decode(body["refreshToken"])
     assert refresh["typ"] == "refresh" and refresh["saas_refresh_token"] == "dev-placeholder"
 
@@ -265,8 +267,8 @@ def test_me_password_user(app_client: TestClient) -> None:
     assert body["user"]["id"] == "USER-A"
     assert len(body["tenants"]) == 3
     assert (
-        body["currentTenantId"] == "TENANT-001"
-    )  # 无 claim → defaultTenant（AuthService.me 镜像）
+        body["currentTenantId"] == "city-lab"
+    )  # 登录 claim tenant_id=首租户 tenant_key（2026-10-20 人裁）
 
 
 @pytest.mark.fn("M00.F01.I01")
@@ -305,17 +307,18 @@ def test_me_sso_user_reads_membership_cache(app_client: TestClient) -> None:
     me = resp.json()
     # SSO 用户走 saas memberships 体系（tenants.find(saas UUID) 跨体系失配防御，
     # AuthService.me 镜像）
+    # 2026-10-20 tenant_key 人裁：tenantId/currentTenantId=tenantKey（t9）
     assert me["tenants"] == [
         {
-            "tenantId": FAKE_SAAS_TENANT_ID,
+            "tenantId": "t9",
             "code": "t9",
             "name": "第三方平台租户",
             "roleIds": ["technician"],
         }
     ]
     assert (
-        me["currentTenantId"] == FAKE_SAAS_TENANT_ID
-    )  # token tenant_id claim（whoami currentTenantId）
+        me["currentTenantId"] == "t9"
+    )  # token tenant_id claim（whoami currentTenantId → tenantKey）
 
 
 @pytest.mark.fn("M00.F01.I01")
@@ -428,7 +431,7 @@ def test_refresh_via_saas_rotation(app_client: TestClient) -> None:
     assert app_client.app.state.directory.get_saas_refresh_token("saas-user-1") == (
         "saas-refresh-2"
     )
-    assert [t["tenantId"] for t in new["tenants"]] == [FAKE_SAAS_TENANT_ID]
+    assert [t["tenantId"] for t in new["tenants"]] == ["t9"]  # tenant_key 人裁
 
 
 @pytest.mark.fn("M01.F05.I04")
@@ -494,7 +497,7 @@ def test_sso_callback_full_flow(app_client: TestClient) -> None:
         "displayName": "Bob",
         "roleCode": "viewer",
     }
-    assert decode(body["token"])["tenant_id"] == FAKE_SAAS_TENANT_ID
+    assert decode(body["token"])["tenant_id"] == "t9"  # tenant_key 人裁（whoami T-9→t9）
     assert decode(body["refreshToken"])["saas_refresh_token"] == "saas-refresh-1"
     assert [t["name"] for t in body["tenants"]] == ["第三方平台租户"]  # admin/tenants 富化
     # 菜单快照已进缓存 → /menus 可用

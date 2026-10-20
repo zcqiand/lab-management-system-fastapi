@@ -59,7 +59,7 @@ def test_brands_crud_roundtrip(db_client: TestClient, bearer: str) -> None:
     assert r1.status_code == 200, r1.text
     row = r1.json()
     assert row["code"] == "BRD-01"
-    assert row["tenantId"] == "TENANT-001"
+    assert row["tenantId"] == "city-lab"
     assert row["name"] == "混凝土牌号"
     assert row["inspectionObjectCode"] == "OBJ-01"
     assert row["remark"] == "R1"
@@ -201,7 +201,7 @@ def test_grades_defaults_and_missing_400(db_client: TestClient, bearer: str) -> 
     )
     assert ok.status_code == 200, ok.text
     row = ok.json()
-    assert row["tenantId"] == "TENANT-001"
+    assert row["tenantId"] == "city-lab"
     assert row["sortOrder"] == 0
     assert "inspectionObjectCode" not in row
     assert "remark" not in row

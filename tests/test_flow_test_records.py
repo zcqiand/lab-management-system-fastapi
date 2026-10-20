@@ -577,7 +577,7 @@ def test_records_crud(db_client: TestClient, bearer: str) -> None:
     # create：TR- 前缀 + NON_NULL 可选不落 JSON
     rec = _mk_record(db_client, headers, s1)
     assert rec["id"].startswith("TR-")
-    assert rec["tenantId"] == "TENANT-001"
+    assert rec["tenantId"] == "city-lab"
     assert "standardCode" not in rec
     assert "requirementCode" not in rec
     assert "verdict" not in rec

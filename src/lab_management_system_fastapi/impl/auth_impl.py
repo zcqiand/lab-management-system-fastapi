@@ -109,14 +109,12 @@ class AuthApiImpl(BaseAuthApi):
         saas_user = saas_login.user
         # saas user 无 displayName、availableTenants 无租户名 → 瞬时持 accessToken 拉
         # 平台租户列表富化（best-effort，失败降级 name=tenantId）
-        tenants = self._tenants_from_login(
-            saas_login.available_tenants,
-            self._fetch_tenant_names(
-                state,
-                saas_login.user_id or (saas_user.id if saas_user is not None else ""),
-                saas_login.access_token,
-            ),
+        name_by_id = self._fetch_tenant_names(
+            state,
+            saas_login.user_id or (saas_user.id if saas_user is not None else ""),
+            saas_login.access_token,
         )
+        tenants = self._tenants_from_login(saas_login.available_tenants, name_by_id)
         user = CurrentUser(
             id=_first_non_empty(
                 saas_user.id if saas_user is not None else None,
@@ -150,12 +148,16 @@ class AuthApiImpl(BaseAuthApi):
             user.display_name,
             user.role_code,
         )
-        # lab 自家 JWT 重签（tenant_id=saas currentTenantId ?? 首租户）；
-        # refresh 维持 dev-placeholder（session 第 5 参 None，不透传 saas refreshToken）
+        # lab 自家 JWT 重签（tenant_id=saas currentTenantId ?? 首租户 → tenant_key，
+        # 2026-10-20 人裁「对外交互用 key」）；refresh 维持 dev-placeholder（session
+        # 第 5 参 None，不透传 saas refreshToken）
         return self._session(
             state,
             user,
-            saas_login.current_tenant_id or (tenants[0].tenant_id if tenants else None),
+            self._resolve_tenant_key(
+                saas_login.current_tenant_id or (tenants[0].tenant_id if tenants else None),
+                name_by_id,
+            ),
             tenants,
             None,
         )
@@ -325,9 +327,14 @@ class AuthApiImpl(BaseAuthApi):
         name_by_id = self._fetch_tenant_names(state, lab_user.id, token.access_token)
         tenants = self._tenants_from(memberships, name_by_id)
         state.membership_cache.put(lab_user.id, tenants)
-        # token 带 tenant_id claim（whoami currentTenantId）——me() 不再落 demo 默认租户
+        # token 带 tenant_id claim（whoami currentTenantId → tenant_key，2026-10-20 人裁）
+        # ——me() 不再落 demo 默认租户
         return self._session(
-            state, lab_user, saas_user.current_tenant_id, tenants, token.refresh_token
+            state,
+            lab_user,
+            self._resolve_tenant_key(saas_user.current_tenant_id, name_by_id),
+            tenants,
+            token.refresh_token,
         )
 
     # === 内部 helpers（AuthService 私有方法镜像） ===
@@ -388,16 +395,18 @@ class AuthApiImpl(BaseAuthApi):
         name_by_id: dict[str, SaasPlatformTenant],
     ) -> list[MyTenant]:
         """userLogin availableTenants → MyTenant（REQ-2026-023）：过滤无 tenantId/removed；
-        富化 miss 降级 code=name=tenantId（与 _tenants_from 同语义）。"""
+        命中富化 tenantId=code=tenantKey（2026-10-20 tenant_key 人裁）；miss 降级原值
+        tenantId（与 _tenants_from 同语义）。"""
         tenants: list[MyTenant] = []
         for t in available_tenants:
             if not t.tenant_id or t.status == "removed":
                 continue
             n = name_by_id.get(t.tenant_id)
+            tid = n.tenant_key if n is not None and n.tenant_key else t.tenant_id
             tenants.append(
                 MyTenant(
-                    tenantId=t.tenant_id,
-                    code=n.tenant_key if n is not None and n.tenant_key else t.tenant_id,
+                    tenantId=tid,
+                    code=tid,
                     name=n.name if n is not None and n.name else t.tenant_id,
                     roleIds=list(t.role_ids),
                 )
@@ -441,20 +450,32 @@ class AuthApiImpl(BaseAuthApi):
         list_of_memberships: list[SaasTenantMembership],
         name_by_id: dict[str, SaasPlatformTenant],
     ) -> list[MyTenant]:
-        """memberships → MyTenant：命中富化 code=tenantKey/name=name；miss 降级双双=tenantId
-        （切换器最差显示 UUID，不空）。"""
+        """memberships → MyTenant：命中富化 tenantId=code=tenantKey（2026-10-20 tenant_key
+        人裁）/name=name；miss 降级原 tenantId（切换器最差显示原标识，不空）。"""
         tenants: list[MyTenant] = []
         for m in list_of_memberships:
             t = name_by_id.get(m.tenant_id)
+            tid = t.tenant_key if t is not None and t.tenant_key else m.tenant_id
             tenants.append(
                 MyTenant(
-                    tenantId=m.tenant_id,
-                    code=t.tenant_key if t is not None and t.tenant_key else m.tenant_id,
+                    tenantId=tid,
+                    code=tid,
                     name=t.name if t is not None and t.name else m.tenant_id,
                     roleIds=list(m.role_ids),
                 )
             )
         return tenants
+
+    @staticmethod
+    def _resolve_tenant_key(
+        saas_tenant_id: str | None, name_by_id: dict[str, SaasPlatformTenant]
+    ) -> str | None:
+        """2026-10-20 tenant_key 人裁：对外交互用 key。平台列表命中且 tenantKey 非空 →
+        tenantKey；miss/lookup 失败降级原标识（与 _tenants_from 同款 best-effort）。"""
+        if not saas_tenant_id:
+            return saas_tenant_id
+        t = name_by_id.get(saas_tenant_id)
+        return t.tenant_key if t is not None and t.tenant_key else saas_tenant_id
 
     def _session(
         self,
