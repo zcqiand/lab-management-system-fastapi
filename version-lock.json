@@ -1,0 +1,15 @@
+{
+  "version_lock": {
+    "python": "3.11（pyproject target-version）",
+    "fastapi": ">=0.115",
+    "uvicorn[standard]": ">=0.30",
+    "pyjwt": "==2.10.1（LabJwtSigner 镜像，HS256）",
+    "sqlalchemy": ">=2.1（主依赖）",
+    "psycopg2-binary": ">=2.9（主依赖）",
+    "pytest": ">=8（dev）",
+    "httpx": ">=0.27（dev）",
+    "sqlacodegen": "==4.0.4（dev，实体反推）",
+    "ruff/mypy": "suite 钉版全局工具链（gate.py RUFF_PINNED_VERSION；项目 venv 禁装遮蔽版，[RUFF-PIN] exit 2）"
+  },
+  "_note": "lab 本地无密码校验（消费 saas IdP），无 bcrypt"
+}

@@ -7,11 +7,13 @@
 ## 快速开始
 
 ```bash
-# 按 fastapi 栈替换为实际命令
-npm install        # 安装依赖
-npm test           # 全量测试（无 Key / 无 Docker / 无网可跑）
-npm run dev        # 本地开发
-npm run build      # 生产构建
+# 前置：python 3.11+，仓内 .venv 就绪（L4 用 .venv\Scripts\python.exe）
+.venv/Scripts/pip install -e ".[dev]"                # 安装依赖（pyproject 主依赖 + dev 组）
+ruff format --check src tests                        # L1 格式
+ruff check src tests                                 # L2 静态
+mypy --strict src                                    # L3 类型（strict）
+.venv/Scripts/python.exe -m pytest -q --tb=short     # L4 测试
+PYTHONPATH=src uvicorn lab_management_system_fastapi.app:app --port 5207   # 本地起服务（入口 src/lab_management_system_fastapi/app.py）
 ```
 
 ## 功能特性
@@ -22,7 +24,9 @@ npm run build      # 生产构建
 
 | 技术 | 版本 |
 | :--- | :--- |
-| __STACK_DESC_LINE__ | |
+| Python | 3.11（pyproject target） |
+| FastAPI | ≥0.115 + uvicorn + SQLAlchemy 2 + psycopg2 |
+| ruff / mypy | suite 钉版全局工具链（gate.py RUFF_PINNED_VERSION，项目 venv 禁装遮蔽版） |
 
 > 依赖版本与 `version-lock.json` 的 `version_lock` 一致，不引入 lock 外的库。
 
