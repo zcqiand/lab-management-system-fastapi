@@ -286,6 +286,7 @@ async def inspection_dictionary_list_objects(
     inspection_specialty_code: Optional[StrictStr] = Query(None, description="", alias="inspectionSpecialtyCode"),
     keyword: Optional[StrictStr] = Query(None, description="", alias="keyword"),
 ) -> InspectionDictionaryListObjects200Response:
+    """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
     if not BaseInspectionDictionaryApi.subclasses:
         raise HTTPException(status_code=500, detail="Not implemented")
     return await BaseInspectionDictionaryApi.subclasses[0]().inspection_dictionary_list_objects(page, page_size, inspection_specialty_code, keyword)
@@ -358,6 +359,7 @@ async def inspection_dictionary_list_parameters(
     keyword: Optional[StrictStr] = Query(None, description="", alias="keyword"),
     source_type: Optional[InspectionParameterSourceType] = Query(None, description="", alias="sourceType"),
 ) -> InspectionDictionaryListParameters200Response:
+    """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
     if not BaseInspectionDictionaryApi.subclasses:
         raise HTTPException(status_code=500, detail="Not implemented")
     return await BaseInspectionDictionaryApi.subclasses[0]().inspection_dictionary_list_parameters(page, page_size, keyword, source_type)
@@ -429,6 +431,7 @@ async def inspection_dictionary_list_specialties(
     page_size: Optional[StrictInt] = Query(None, description="", alias="pageSize"),
     keyword: Optional[StrictStr] = Query(None, description="", alias="keyword"),
 ) -> InspectionDictionaryListSpecialties200Response:
+    """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
     if not BaseInspectionDictionaryApi.subclasses:
         raise HTTPException(status_code=500, detail="Not implemented")
     return await BaseInspectionDictionaryApi.subclasses[0]().inspection_dictionary_list_specialties(page, page_size, keyword)
@@ -501,6 +504,7 @@ async def inspection_dictionary_list_standards(
     keyword: Optional[StrictStr] = Query(None, description="", alias="keyword"),
     status: Optional[InspectionStandardStatus] = Query(None, description="", alias="status"),
 ) -> InspectionDictionaryListStandards200Response:
+    """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
     if not BaseInspectionDictionaryApi.subclasses:
         raise HTTPException(status_code=500, detail="Not implemented")
     return await BaseInspectionDictionaryApi.subclasses[0]().inspection_dictionary_list_standards(page, page_size, keyword, status)

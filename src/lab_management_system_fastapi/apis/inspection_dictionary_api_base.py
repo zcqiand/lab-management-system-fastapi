@@ -136,6 +136,7 @@ class BaseInspectionDictionaryApi:
         inspection_specialty_code: Optional[StrictStr],
         keyword: Optional[StrictStr],
     ) -> InspectionDictionaryListObjects200Response:
+        """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
         ...
 
 
@@ -168,6 +169,7 @@ class BaseInspectionDictionaryApi:
         keyword: Optional[StrictStr],
         source_type: Optional[InspectionParameterSourceType],
     ) -> InspectionDictionaryListParameters200Response:
+        """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
         ...
 
 
@@ -199,6 +201,7 @@ class BaseInspectionDictionaryApi:
         page_size: Optional[StrictInt],
         keyword: Optional[StrictStr],
     ) -> InspectionDictionaryListSpecialties200Response:
+        """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
         ...
 
 
@@ -231,6 +234,7 @@ class BaseInspectionDictionaryApi:
         keyword: Optional[StrictStr],
         status: Optional[InspectionStandardStatus],
     ) -> InspectionDictionaryListStandards200Response:
+        """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
         ...
 
 

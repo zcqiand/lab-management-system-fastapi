@@ -30,6 +30,7 @@ class BaseInspectionCatalogApi:
         inspection_object_code: Optional[StrictStr],
         keyword: Optional[StrictStr],
     ) -> CatalogListBrands200Response:
+        """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
         ...
 
 
@@ -62,6 +63,7 @@ class BaseInspectionCatalogApi:
         inspection_object_code: Optional[StrictStr],
         keyword: Optional[StrictStr],
     ) -> CatalogListGrades200Response:
+        """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
         ...
 
 
@@ -94,6 +96,7 @@ class BaseInspectionCatalogApi:
         inspection_object_code: Optional[StrictStr],
         keyword: Optional[StrictStr],
     ) -> CatalogListModels200Response:
+        """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
         ...
 
 
@@ -126,6 +129,7 @@ class BaseInspectionCatalogApi:
         inspection_object_code: Optional[StrictStr],
         keyword: Optional[StrictStr],
     ) -> CatalogListSpecs200Response:
+        """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
         ...
 
 

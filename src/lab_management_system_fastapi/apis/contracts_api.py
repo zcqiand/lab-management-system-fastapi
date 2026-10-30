@@ -55,6 +55,7 @@ async def contracts_list_contracts(
     keyword: Optional[StrictStr] = Query(None, description="", alias="keyword"),
     status: Optional[ContractStatus] = Query(None, description="", alias="status"),
 ) -> ContractsListContracts200Response:
+    """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
     if not BaseContractsApi.subclasses:
         raise HTTPException(status_code=500, detail="Not implemented")
     return await BaseContractsApi.subclasses[0]().contracts_list_contracts(page, page_size, keyword, status)

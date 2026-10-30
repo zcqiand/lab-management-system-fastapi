@@ -63,6 +63,7 @@ async def report_names_list_report_names(
     page_size: Optional[StrictInt] = Query(None, description="", alias="pageSize"),
     keyword: Optional[StrictStr] = Query(None, description="", alias="keyword"),
 ) -> ReportNamesListReportNames200Response:
+    """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
     if not BaseReportNamesApi.subclasses:
         raise HTTPException(status_code=500, detail="Not implemented")
     return await BaseReportNamesApi.subclasses[0]().report_names_list_report_names(page, page_size, keyword)

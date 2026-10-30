@@ -33,8 +33,8 @@ class SamplesListSamples200Response(BaseModel):
     SamplesListSamples200Response
     """ # noqa: E501
     items: List[Sample]
-    page: StrictInt = Field(json_schema_extra={"examples": [1]})
-    page_size: StrictInt = Field(alias="pageSize", json_schema_extra={"examples": [20]})
+    page: StrictInt = Field(description="当前实现仅回显，不切片：参照实现返回全量，无分页语义。", json_schema_extra={"examples": [1]})
+    page_size: StrictInt = Field(description="当前实现仅回显，不切片。", alias="pageSize", json_schema_extra={"examples": [20]})
     total: StrictInt = Field(json_schema_extra={"examples": [0]})
     __properties: ClassVar[List[str]] = ["items", "page", "pageSize", "total"]
 

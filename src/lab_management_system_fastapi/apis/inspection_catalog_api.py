@@ -60,6 +60,7 @@ async def catalog_list_brands(
     inspection_object_code: Optional[StrictStr] = Query(None, description="", alias="inspectionObjectCode"),
     keyword: Optional[StrictStr] = Query(None, description="", alias="keyword"),
 ) -> CatalogListBrands200Response:
+    """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
     if not BaseInspectionCatalogApi.subclasses:
         raise HTTPException(status_code=500, detail="Not implemented")
     return await BaseInspectionCatalogApi.subclasses[0]().catalog_list_brands(page, page_size, inspection_object_code, keyword)
@@ -132,6 +133,7 @@ async def catalog_list_grades(
     inspection_object_code: Optional[StrictStr] = Query(None, description="", alias="inspectionObjectCode"),
     keyword: Optional[StrictStr] = Query(None, description="", alias="keyword"),
 ) -> CatalogListGrades200Response:
+    """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
     if not BaseInspectionCatalogApi.subclasses:
         raise HTTPException(status_code=500, detail="Not implemented")
     return await BaseInspectionCatalogApi.subclasses[0]().catalog_list_grades(page, page_size, inspection_object_code, keyword)
@@ -204,6 +206,7 @@ async def catalog_list_models(
     inspection_object_code: Optional[StrictStr] = Query(None, description="", alias="inspectionObjectCode"),
     keyword: Optional[StrictStr] = Query(None, description="", alias="keyword"),
 ) -> CatalogListModels200Response:
+    """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
     if not BaseInspectionCatalogApi.subclasses:
         raise HTTPException(status_code=500, detail="Not implemented")
     return await BaseInspectionCatalogApi.subclasses[0]().catalog_list_models(page, page_size, inspection_object_code, keyword)
@@ -276,6 +279,7 @@ async def catalog_list_specs(
     inspection_object_code: Optional[StrictStr] = Query(None, description="", alias="inspectionObjectCode"),
     keyword: Optional[StrictStr] = Query(None, description="", alias="keyword"),
 ) -> CatalogListSpecs200Response:
+    """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
     if not BaseInspectionCatalogApi.subclasses:
         raise HTTPException(status_code=500, detail="Not implemented")
     return await BaseInspectionCatalogApi.subclasses[0]().catalog_list_specs(page, page_size, inspection_object_code, keyword)

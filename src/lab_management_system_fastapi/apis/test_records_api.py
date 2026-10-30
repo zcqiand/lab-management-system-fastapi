@@ -55,6 +55,7 @@ async def test_records_list_test_records(
     sample_id: Optional[StrictStr] = Query(None, description="", alias="sampleId"),
     parameter_code: Optional[StrictStr] = Query(None, description="", alias="parameterCode"),
 ) -> TestRecordsListTestRecords200Response:
+    """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
     if not BaseTestRecordsApi.subclasses:
         raise HTTPException(status_code=500, detail="Not implemented")
     return await BaseTestRecordsApi.subclasses[0]().test_records_list_test_records(page, page_size, sample_id, parameter_code)

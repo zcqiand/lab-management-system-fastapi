@@ -56,6 +56,7 @@ async def param_interfaces_list_param_interfaces(
     page_size: Optional[StrictInt] = Query(None, description="", alias="pageSize"),
     keyword: Optional[StrictStr] = Query(None, description="", alias="keyword"),
 ) -> ParamInterfacesListParamInterfaces200Response:
+    """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
     if not BaseParamInterfacesApi.subclasses:
         raise HTTPException(status_code=500, detail="Not implemented")
     return await BaseParamInterfacesApi.subclasses[0]().param_interfaces_list_param_interfaces(page, page_size, keyword)

@@ -61,6 +61,7 @@ async def receipts_list_receipts(
     flow_status: Optional[FlowStatus] = Query(None, description="", alias="flowStatus"),
     filter: Optional[StrictStr] = Query(None, description="", alias="filter"),
 ) -> ReceiptsListReceipts200Response:
+    """分页：当前实现仅回显不切片，参照实现返回全量，无分页语义（pageSize 同）。"""
     if not BaseReceiptsApi.subclasses:
         raise HTTPException(status_code=500, detail="Not implemented")
     return await BaseReceiptsApi.subclasses[0]().receipts_list_receipts(page, page_size, keyword, contract_id, flow_status, filter)
