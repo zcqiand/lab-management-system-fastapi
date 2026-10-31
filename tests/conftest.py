@@ -1,16 +1,17 @@
-"""pytest 适配器：@pytest.mark.fn -> suite 契约的 .state/trace.json。
+"""仓专属 fixtures 的 conftest。
 
 批2（REQ-2026-003）增补：L4 打 PG 真库 scratch 库 ``lab_fastapi_scratch``
 （镜像 saas fastapi conftest 配方：DROP→CREATE→create_all→收工 DROP，
 fail-fast 在 fixture 内不在 import 期——trace collect-only 不碰 env）。
+
+5.126 拆分重构：trace 钩子迁 tests/harness_trace.py（harness 机器件，sync 面），
+本文件仓专属 fixtures——命名导入把 hook 挂进 pytest。
 """
 
 from __future__ import annotations
 
-import json
 import os
 from collections.abc import Iterator
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -41,35 +42,10 @@ from lab_management_system_fastapi.entities import (
     InspectionTechnicalRequirements,
 )
 from lab_management_system_fastapi.impl.config import AppConfig, normalize_database_url
-
-
-def pytest_configure(config: pytest.Config) -> None:
-    config.addinivalue_line(
-        "markers", "fn(id, ...): 该测试验证的功能子项 ID，如 @pytest.mark.fn('M06.F01.I01')"
-    )
-
-
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """trace 适配器（saas 仓同款）：TRACE_MAP=1 时把 fn marker 映射写 trace.json——
-    suite 契约二唯一产出通道（harness.load_trace 只跑 trace_cmd，写入靠本钩子）。"""
-    if os.environ.get("TRACE_MAP") != "1":
-        return
-    entries = []
-    for item in items:
-        fns: list[str] = []
-        for marker in item.iter_markers(name="fn"):
-            fns.extend(str(a) for a in marker.args)
-        inert = any(item.get_closest_marker(n) is not None for n in ("skip", "skipif", "xfail"))
-        entries.append(
-            {"test": item.nodeid, "fns": [] if inert else sorted(set(fns)), "inert": inert}
-        )
-    out = Path(str(config.rootpath)) / ".state" / "trace.json"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(
-        json.dumps({"schema": 1, "tests": entries}, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
-
+from tests.harness_trace import (  # noqa: F401 —— hook 命名导入进本命名空间供 pytest 挂载
+    pytest_collection_modifyitems,
+    pytest_configure,
+)
 
 SCRATCH_DB = "lab_fastapi_scratch"
 
