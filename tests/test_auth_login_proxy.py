@@ -230,6 +230,9 @@ def test_login_session_coherence_me_and_switch_stay_in_saas_tenant_system() -> N
     me_body = me.json()
     assert me_body["tenants"][0]["tenantId"] == tid
     assert len(me_body["tenants"]) == len(body["tenants"])
+    # 5.120 家族裁定：login/me username 自洽（修前 email-first upsert 让 me 报
+    # alice@saas.local、login 报 alice——CT 627/628 分叉根源）
+    assert me_body["user"]["username"] == body["user"]["username"]
 
     # switch-tenant：登录响应里的租户可切 → 200 + 3 段真 JWT（tenant_id=目标租户）
     switched = client.post("/api/auth/switch-tenant", json={"tenantId": tid}, headers=bearer)

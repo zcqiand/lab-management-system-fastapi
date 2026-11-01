@@ -140,11 +140,13 @@ class AuthApiImpl(BaseAuthApi):
         # REQ-2026-023 live 回归（2026-10-11 五目标 401 指纹）：密码登录用户落
         # membership 快照 + directory（镜像 ssoCallback 链）——me/switch 的
         # _resolve_user 按 sub=saas user id 解析，不落目录必 unknown user 401；
-        # me/switch 归属校验吃快照。email 缺失降级 username 作 upsert 键。
+        # me/switch 归属校验吃快照。5.120 家族裁定：upsert 首选 username（login/me
+        # 自洽，回 9 月基线），email 缺失才降级——目录 upsert 第二参兼作键与
+        # username，email-first 曾让 me 报 email 而 login 报 username（CT 627/628）。
         state.membership_cache.put(user.id, tenants)
         state.directory.upsert(
             user.id,
-            _first_non_empty(saas_user.email if saas_user is not None else None, user.username),
+            _first_non_empty(user.username, saas_user.email if saas_user is not None else None),
             user.display_name,
             user.role_code,
         )
