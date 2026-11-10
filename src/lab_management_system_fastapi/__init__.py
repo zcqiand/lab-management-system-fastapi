@@ -1,4 +1,4 @@
-"""实验室管理系统 —— FastAPI 后端。
+"""建筑工程实验室管理系统 —— FastAPI 后端。
 
 生成区（禁手改，scripts/gen-shared.sh / scaffold-entities.sh 先删后写）：
   apis/ models/ security_api.py entities.py

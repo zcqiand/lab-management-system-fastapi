@@ -1,6 +1,6 @@
-# 实验室管理系统
+# 建筑工程实验室管理系统
 
-实验室管理系统（`lab-management-system-fastapi`）——一句话系统定位（待补）。
+建筑工程实验室管理系统（`lab-management-system-fastapi`）——一句话系统定位（待补）。
 
 本仓为《（书稿信息待补）》案例（待补）的可运行配套工程，是书稿代码块的 **source of truth**。
 

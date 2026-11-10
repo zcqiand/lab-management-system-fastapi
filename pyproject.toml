@@ -1,7 +1,7 @@
 [project]
 name = "lab-management-system-fastapi"
 version = "0.1.0"
-description = "实验室管理系统"
+description = "建筑工程实验室管理系统"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",

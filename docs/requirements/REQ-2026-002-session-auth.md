@@ -87,7 +87,7 @@ env（DATABASE_URL / JWT 三键 / 身份平台地址与 OAuth 凭据）fail-fast
 | 风险 | 影响面 | 缓解 | 回滚方式 |
 |---|---|---|---|
 | 语义与家族分叉（错误码/claim 口径/租户过滤） | contract-test 批6 接入 | 逐条对照 lab-springboot 源码实现，注释标注参照行 | git revert 本批 commit |
-| SSO 簇依赖 saas 身份平台可达 | T-3 测试 | 单测内以契约形状断言为主（authorize/callback 形状锁），saas 联调归批6 live；本机 saas dev 栈在跑可真连 | 端点独立可关 |
+| SSO 簇依赖 SaaS 多租户多应用身份平台可达 | T-3 测试 | 单测内以契约形状断言为主（authorize/callback 形状锁），saas 联调归批6 live；本机 saas dev 栈在跑可真连 | 端点独立可关 |
 | 测试直连远程 PG | L4 变慢/轮换假红 | scratch 库建在同服务器（镜像 saas fastapi 配方）；假红先 ping 看丢包隔离复跑 | 断言失败即红，无静默 |
 | mypy strict 与生成区 Any 缝隙 | L3 | 生成区 follow_imports=skip 既有接线；impl 不显式 Any/type: ignore | 既有 pyproject 配置 |
 

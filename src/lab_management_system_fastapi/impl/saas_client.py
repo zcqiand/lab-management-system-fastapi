@@ -1,4 +1,4 @@
-"""saas 身份平台 HTTP 客户端 —— lab-springboot SaasAuthClient/SaasMeClient 镜像
+"""SaaS 多租户多应用身份平台 HTTP 客户端 —— lab-springboot SaasAuthClient/SaasMeClient 镜像
 （REQ-2026-002 T-3）。
 
 - SaasAuthClient：服务账号登录（POST /api/v1/auth/login）+ token 端点

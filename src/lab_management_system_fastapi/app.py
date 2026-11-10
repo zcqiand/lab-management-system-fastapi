@@ -132,7 +132,7 @@ def create_app(config: AppConfig, engine: Engine | None = None) -> FastAPI:
         if engine is not None
         else create_engine(normalize_database_url(config.database_url), pool_pre_ping=True)
     )
-    app = FastAPI(title="实验室管理系统", version="0.1.0")
+    app = FastAPI(title="建筑工程实验室管理系统", version="0.1.0")
     app.state.config = config
     app.state.engine = db_engine
     app.state.session_factory = sessionmaker(bind=db_engine, expire_on_commit=False)

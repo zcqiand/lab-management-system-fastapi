@@ -51,7 +51,7 @@
 | 任务 ID | 任务描述 | 类型 | 负责人 | 预估 | 状态 |
 |---|---|---|---|---|---|
 | T-1 | 根路径跳转：`@app.get("/", include_in_schema=False)` → `RedirectResponse("/docs")`（匿名） | 开发 | claude | XS | 已完成（2026-10-02，red→green：改前 GET / 404，改后 307 Location /docs；tests/test_root_redirect.py 三断言 3 passed，不挂 fn ID） |
-| T-2 | L1-L4 门禁回归 + curl 三验（307、跟随 200、/api/* 不回归） | 门禁 | claude | XS | 已完成（2026-10-02，L0-L4 全绿 96 passed/26:34 含新 3 断言；curl 三验：GET / 307 Location /docs、跟随 200 渲染「实验室管理系统 - Swagger UI」、/openapi.json 200 且 root 不落 paths、/api/auth/menus 裸 401 契约面不回归） |
+| T-2 | L1-L4 门禁回归 + curl 三验（307、跟随 200、/api/* 不回归） | 门禁 | claude | XS | 已完成（2026-10-02，L0-L4 全绿 96 passed/26:34 含新 3 断言；curl 三验：GET / 307 Location /docs、跟随 200 渲染「建筑工程实验室管理系统 - Swagger UI」、/openapi.json 200 且 root 不落 paths、/api/auth/menus 裸 401 契约面不回归） |
 
 ## 4. 功能影响（需求与功能对齐的唯一位置）
 
